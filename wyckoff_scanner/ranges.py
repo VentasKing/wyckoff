@@ -115,7 +115,7 @@ class Range:
 def detect_ranges(df: pd.DataFrame, tf: str, ltf_swing_highs=None, ltf_swing_lows=None,
                   side: str = "both", require_color: bool = False, require_bos: bool = False,
                   allow_nested: bool = True, tap2_return: str = "either",
-                  ltf_frames=None) -> list[Range]:
+                  ltf_frames=None, trend_lookback: int = 50) -> list[Range]:
     """Find every confirmed range on `df` and run its tap state machine to the
     last bar.  `ltf_swing_*` are lists of (time, price) from lower timeframes,
     used for the break-of-structure check.
@@ -129,13 +129,13 @@ def detect_ranges(df: pd.DataFrame, tf: str, ltf_swing_highs=None, ltf_swing_low
     if side in ("both", "accumulation"):
         ltf = [make_frame(t, d) for t, d in ltf_frames]
         out += _detect_accumulation(df, tf, ltf_swing_highs or [], require_color, "accumulation",
-                                    require_bos, tap2_return, ltf)
+                                    require_bos, tap2_return, ltf, trend_lookback)
     if side in ("both", "distribution"):
         m = mirror(df)
         lows_m = [(t, -p) for t, p in (ltf_swing_lows or [])]   # LTF lows become highs
         ltf_m = [make_frame(t, _mirror_cached(d)) for t, d in ltf_frames]
         rs = _detect_accumulation(m, tf, lows_m, require_color, "distribution", require_bos,
-                                  tap2_return, ltf_m)
+                                  tap2_return, ltf_m, trend_lookback)
         out += [_unmirror(r) for r in rs]
     return _handle_nested(out, allow_nested)
 
@@ -203,8 +203,11 @@ def _unmirror(r: Range) -> Range:
 # --------------------------------------------------------------------------
 # accumulation detection
 # --------------------------------------------------------------------------
+MIN_TREND_HISTORY = 10
+
+
 def _detect_accumulation(df, tf, ltf_highs, require_color, side_label, require_bos=False,
-                         tap2_return="either", ltf=None):
+                         tap2_return="either", ltf=None, trend_lookback=50):
     o, h, l, c = (df[k].to_numpy(dtype=float) for k in ("open", "high", "low", "close"))
     arrs = (o, h, l, c)
     n = len(df)
@@ -228,6 +231,13 @@ def _detect_accumulation(df, tf, ltf_highs, require_color, side_label, require_b
         prev_low = s
         if not is_new_low:
             continue
+        # tap 1 ends the trend on this timeframe: a selling climax must be the lowest
+        # low of the previous `trend_lookback` candles (in an uptrend a pullback low
+        # never is, so ranges there are drawn from the top down, and vice versa)
+        if trend_lookback:
+            prior = l[max(0, sc.idx - trend_lookback): sc.idx]
+            if len(prior) < min(trend_lookback, MIN_TREND_HISTORY) or prior.min() <= sc.price:
+                continue
         # valid two-candle leg down into the SC
         leg_start = prev_high.idx if prev_high else 0
         if not has_two_candle_leg(arrs, leg_start, sc.idx, "down", require_color):

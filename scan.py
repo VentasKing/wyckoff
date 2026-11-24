@@ -177,7 +177,8 @@ def scan_stocks(cfg) -> tuple[list[dict], dict]:
             if not frames:
                 continue
             ranges = scan_frames(frames, require_bos=rules["require_ar_break_of_structure"],
-                                 allow_nested=rules["allow_nested_ranges"], tap2_return=rules["tap2_return"])
+                                 allow_nested=rules["allow_nested_ranges"], tap2_return=rules["tap2_return"],
+                                 trend_lookback=int(rules.get("trend_lookback", 50)))
             sigs += signal_records("stocks", u["symbol"], u["tv"], frames, ranges, cfg)
         except Exception as e:  # noqa: BLE001
             print(f"  {u['symbol']}: {e}")
@@ -206,7 +207,8 @@ def scan_crypto(cfg) -> tuple[list[dict], dict]:
             if not frames:
                 continue
             ranges = scan_frames(frames, require_bos=rules["require_ar_break_of_structure"],
-                                 allow_nested=rules["allow_nested_ranges"], tap2_return=rules["tap2_return"])
+                                 allow_nested=rules["allow_nested_ranges"], tap2_return=rules["tap2_return"],
+                                 trend_lookback=int(rules.get("trend_lookback", 50)))
             sigs += signal_records("crypto", p["product_id"], coinbase_tv_symbol(p), frames, ranges, cfg)
         except Exception as e:  # noqa: BLE001
             print(f"  {p['product_id']}: {e}")

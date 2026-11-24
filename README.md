@@ -55,6 +55,7 @@ flood. From then on you get alerts for new ones.
 | `rules.tap2_return` | `"either"`, `"quarter"`, `"two_closes"`, `"close"` |
 | `rules.require_ar_break_of_structure` | `true` / `false` |
 | `rules.allow_nested_ranges` | `true` / `false` |
+| `rules.trend_lookback` | tap 1 must be the lowest low (selling climax) or highest high (buying climax) of this many previous candles, so ranges follow the trend; `0` turns it off |
 | `alerts.tap3_potential`, `alerts.tap3_confirmed`, `alerts.model1_forming` | `true` / `false` |
 | `alerts.max_bars_ago` | only alert for taps this many candles old or newer |
 | `display.timezone` | e.g. `"America/Los_Angeles"` |

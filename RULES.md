@@ -39,7 +39,7 @@ daily, 20–30 min each for 30-min and 5-min history. After that, updates take a
 | Step | Rule |
 |---|---|
 | Market structure | **Two-candle rule**: two candles where the 2nd trades beyond the 1st (lower low going down, higher high going up). Inside candles don't count. Optional `require_color` also requires bearish/bullish closes. |
-| Tap 1 – SC | A swing low that makes a new low, with valid two-candle structure into it. |
+| Tap 1 – SC | A swing low that makes a new low, with valid two-candle structure into it, and is the **lowest low of the previous `trend_lookback` candles** (default 50): tap 1 ends the trend, so in an uptrend ranges are drawn from the top down and in a downtrend from the bottom up. |
 | AR | Highest high after the SC before price trades into the EQ. Should **break structure** (exceed the latest swing high before the SC on the range's own timeframe). If it doesn't, the range is kept with red flag `ar_no_break_of_structure` (`require_bos=True` drops it). Needs two candles up into it and two down out of it. |
 | Range confirmed | First candle that trades into the **EQ** (50% of SC→AR). |
 | Tap 2 | Trades below range low. Invalid if any candle **closes** beyond `low − k·range` (k = 0.25; 0.30 on 1W/1M). Completes only on enough displacement by a candle **after** the one that made the tap-2 extreme: `either` (default) = quarter or two_closes, whichever comes first; `quarter` = close past the midpoint of range low and EQ; `two_closes` = two consecutive closes back inside; `close` = one close back inside. Until then further pushes extend tap 2. Wick-only vs closed-outside is recorded. |

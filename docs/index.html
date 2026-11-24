@@ -394,7 +394,7 @@ body.show-settings #dash{display:none}body.show-settings #settings{display:block
         <div class="muted" style="font-size:12px;margin-top:8px">My list · ${c.stocks.tickers.length} tickers</div>${tags(c.stocks.tickers)}</div>
       <div class="card"><h2>Crypto</h2>${kv('Scanning', c.crypto.enabled ? esc(c.crypto.universe) : 'Off')}${kv('Timeframes', esc(c.crypto.timeframes.join(' · ')))}${kv('Data', 'Coinbase spot, free')}
         <div class="muted" style="font-size:12px;margin-top:8px">My list · ${c.crypto.products.length} coins</div>${tags(c.crypto.products)}</div>
-      <div class="card"><h2>Model rules</h2>${kv('Tap 2 is complete when price…', esc(t2))}${kv('Require the AR to break structure', yes(c.rules.require_ar_break_of_structure))}${kv('Allow ranges inside larger ranges', yes(c.rules.allow_nested_ranges))}</div>
+      <div class="card"><h2>Model rules</h2>${kv('Tap 2 is complete when price…', esc(t2))}${kv('Require the AR to break structure', yes(c.rules.require_ar_break_of_structure))}${kv('Allow ranges inside larger ranges', yes(c.rules.allow_nested_ranges))}${kv('Tap 1 must be the extreme of the last', (c.rules.trend_lookback ?? 50) + ' candles')}</div>
       <div class="card"><h2>Phone alerts</h2>${kv('Tap 3 potential', yes(c.alerts.tap3_potential))}${kv('Tap 3 confirmed', yes(c.alerts.tap3_confirmed))}${kv('Model 1 forming', yes(c.alerts.model1_forming))}${kv('Only taps from the last', c.alerts.max_bars_ago + ' bars')}${kv('Time zone', esc(c.display.timezone))}
         <div class="muted" style="font-size:12px;margin-top:8px">Alerts go to your ntfy topic, kept in the repository's secrets (NTFY_TOPIC).</div></div>`;
   }

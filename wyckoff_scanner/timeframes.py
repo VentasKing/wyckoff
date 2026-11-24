@@ -33,7 +33,7 @@ def build_frames(base: pd.DataFrame, tfs: list[str]) -> dict[str, pd.DataFrame]:
 def scan_frames(frames: dict[str, pd.DataFrame], require_color: bool = False,
                 only_active: bool = False, bos_from_lower_tfs: bool = False,
                 require_bos: bool = False, allow_nested: bool = True,
-                tap2_return: str = "either") -> list[Range]:
+                tap2_return: str = "either", trend_lookback: int = 50) -> list[Range]:
     """frames: {tf: ohlc dataframe}.  The AR's break of structure is judged on
     the range's own timeframe unless bos_from_lower_tfs=True.  Keys must be ordered lowest -> highest TF
     (or be a subset of TIMEFRAMES, in which case they are sorted)."""
@@ -51,7 +51,7 @@ def scan_frames(frames: dict[str, pd.DataFrame], require_color: bool = False,
         lh, ll = (ltf_highs, ltf_lows) if bos_from_lower_tfs else ([], [])
         for r in detect_ranges(df, tf, lh, ll, require_color=require_color,
                                require_bos=require_bos, allow_nested=allow_nested,
-                               tap2_return=tap2_return,
+                               tap2_return=tap2_return, trend_lookback=trend_lookback,
                                ltf_frames=[(t, frames[t]) for t in reversed(done)]):
             by_key[r.key] = r          # higher TF overwrites lower TF
         sw = find_swings(df, require_color)

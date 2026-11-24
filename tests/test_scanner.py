@@ -60,6 +60,7 @@ def test_ar_without_bos_is_flagged_not_dropped():
 
 def test_aggressive_move_without_prior_structure():
     p = Path(200)
+    p.leg(202, 10)                           # some history before the drop
     p.leg(100, 6)                            # straight drop, no swing highs before the SC
     p.leg(140, 4).leg(118, 3)
     r = only(detect_ranges(p.df(), "1D"))
@@ -282,7 +283,7 @@ def test_newer_range_supersedes_old_one_before_tap2():
     trended to the opposite end and back, building a new climax near the old
     range low.  The new range should own the taps; the old one is superseded."""
     p = confirmed_only()                      # old range: SC 99.7, AR 140.3
-    p.leg(139, 6).leg(120, 3).leg(132, 3)     # wanders up near the opposite end
+    p.leg(139, 20).leg(120, 15).leg(132, 15)  # wanders near the opposite end for a while
     p.leg(101, 6)                             # long trend down -> new SC ~100.7 (above 99.7)
     p.leg(116, 3).leg(107, 2)                 # new AR ~116.3, EQ ~108.5 touched -> confirmed
     p.leg(103, 2)
@@ -462,3 +463,26 @@ def test_zone_source_candles_are_recorded():
     ob_t = pd.Timestamp(r.demand_src["ob"], tz="UTC")
     assert df.loc[ob_t, "high"] == pytest.approx(r.demand_zone[1])         # OB candle = zone top
     assert pd.Timestamp(r.liquidity_src["low"], tz="UTC") in df.index
+
+
+def test_pullback_in_uptrend_is_not_a_selling_climax():
+    """SOL case: a few red candles inside an uptrend make a swing low, but price was
+    lower earlier, so it can't be tap 1 of an accumulation."""
+    p = Path(60)
+    p.leg(90, 30)                         # strong uptrend
+    p.leg(88, 2).leg(93, 3)               # small higher low ~87.7
+    p.leg(86, 3)                          # 3-candle pullback -> swing low ~85.7 (below 87.7)
+    p.leg(100, 3)                         # rally (AR-like)
+    p.leg(92.5, 3)                        # back to the EQ
+    acc = [r for r in detect_ranges(p.df(), "30m") if r.side == "accumulation"]
+    assert acc == []
+    off = [r for r in detect_ranges(p.df(), "30m", trend_lookback=0) if r.side == "accumulation"]
+    assert off and off[0].climax_price == pytest.approx(85.7)     # what the old rule found
+
+
+def test_buying_climax_at_end_of_uptrend_still_found():
+    p = Path(60)
+    p.leg(90, 30).leg(84, 3).leg(100, 3)  # top of the uptrend ~100.3
+    p.leg(80, 4).leg(91, 3)               # AR low, back up to the EQ
+    dist = [r for r in detect_ranges(p.df(), "30m") if r.side == "distribution"]
+    assert dist and dist[0].climax_price == pytest.approx(100.3)
