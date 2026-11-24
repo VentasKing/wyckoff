@@ -276,14 +276,17 @@ def _detect_accumulation(df, tf, ltf_highs, require_color, side_label, require_b
             continue
 
         run_hi = None
+        failed_ar = None        # an AR that failed: only a deeper one is checked after it
         outcome = "no retrace to the EQ yet"
         for i in range(sc.idx + 1, n):
             if l[i] < sc.price:
-                outcome = (f"price went past it on {times[i]:%Y-%m-%d %H:%M} before retracing to the EQ, "
-                           f"so it was never a range")
+                outcome = (f"price went past it on {times[i]:%Y-%m-%d %H:%M} before a valid AR and EQ retrace, "
+                           f"so it was never a range" + (f" ({outcome})" if failed_ar is not None else ""))
                 break
             if run_hi is None or h[i] > h[run_hi]:
                 run_hi = i
+                continue
+            if run_hi == failed_ar:
                 continue
             eq = (sc.price + h[run_hi]) / 2
             if l[i] <= eq:
@@ -299,7 +302,10 @@ def _detect_accumulation(df, tf, ltf_highs, require_color, side_label, require_b
                         why.append(f"no two-candle leg {'up' if acc else 'down'} into the AR")
                     if not has_two_candle_leg(arrs, run_hi, i, "down", require_color):
                         why.append(f"no two-candle leg {'down' if acc else 'up'} from the AR to the EQ")
-                    outcome = (f"AR at {real(h[run_hi]):.6g} ({times[run_hi]:%Y-%m-%d}) rejected: " + "; ".join(why))
+                    outcome = (f"AR at {real(h[run_hi]):.6g} ({times[run_hi]:%Y-%m-%d}) rejected: " + "; ".join(why)
+                               + "; waiting for a deeper AR")
+                    failed_ar = run_hi           # keep the tap 1, look for a deeper AR
+                    continue
                 if ok:
                     outcome = None
                     note(sc, f"range confirmed: AR {real(h[run_hi]):.6g} on {times[run_hi]:%Y-%m-%d}, "
