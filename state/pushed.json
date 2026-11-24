@@ -2,6 +2,7 @@
 "AAPL-4h-distribution-2026-11-05T14-30-00Z-model2-liquidity|confirmed",
 "AAVE-USD-15m-accumulation-2026-11-23T22-45-00Z-model1|forming",
 "AAVE-USD-15m-accumulation-2026-11-23T22-45-00Z-model2-liquidity|potential",
+"AAVE-USD-15m-accumulation-2026-11-24T03-00-00Z-model1|forming",
 "AAVE-USD-1D-accumulation-2026-11-15T00-00-00Z-model2-liquidity|potential",
 "ABBV-4h-accumulation-2026-11-06T14-30-00Z-model2-demand|potential",
 "ADA-USD-1h-distribution-2026-11-19T13-00-00Z-model2-liquidity|potential",
@@ -14,6 +15,7 @@
 "AMZN-4h-distribution-2026-10-20T13-30-00Z-model1|confirmed",
 "AVGO-1h-distribution-2026-10-28T19-30-00Z-model1|confirmed",
 "BAT-USD-4h-accumulation-2026-11-21T04-00-00Z-model1|confirmed",
+"BCH-USD-15m-accumulation-2026-11-23T22-45-00Z-model1|forming",
 "BCH-USD-15m-accumulation-2026-11-23T22-45-00Z-model2-demand|potential",
 "BCH-USD-1W-accumulation-2025-04-07T00-00-00Z-model1|forming",
 "BCH-USD-30m-accumulation-2026-11-23T12-30-00Z-model1|confirmed",
@@ -34,6 +36,7 @@
 "NET-30m-accumulation-2026-11-17T15-30-00Z-model1|confirmed",
 "NET-4h-distribution-2026-11-13T14-30-00Z-model2-supply|potential",
 "OXY-4h-accumulation-2026-11-10T14-30-00Z-model1|forming",
+"PENGU-USD-15m-accumulation-2026-11-24T03-00-00Z-model1|forming",
 "PEPE-USD-1W-accumulation-2025-12-15T00-00-00Z-model1|confirmed",
 "PFE-1W-distribution-2026-03-30T00-00-00Z-model1|confirmed",
 "PG-30m-accumulation-2026-11-13T16-00-00Z-model2-liquidity|confirmed",
@@ -45,6 +48,7 @@
 "SLB-1W-distribution-2026-05-25T00-00-00Z-model2-liquidity|confirmed",
 "SNOW-1D-accumulation-2026-11-06T05-00-00Z-model1|confirmed",
 "SOL-USD-30m-accumulation-2026-11-23T12-30-00Z-model1|confirmed",
+"SUI-USD-15m-accumulation-2026-11-23T22-45-00Z-model1|forming",
 "SUI-USD-15m-accumulation-2026-11-23T22-45-00Z-model2-demand|potential",
 "TGT-1W-accumulation-2023-10-02T00-00-00Z-model1|confirmed",
 "TMUS-1h-distribution-2026-10-08T18-30-00Z-model2-liquidity|confirmed",
@@ -53,5 +57,6 @@
 "XLE-4h-accumulation-2026-09-29T13-30-00Z-model1|forming",
 "XLF-1D-distribution-2026-09-03T04-00-00Z-model2-supply|confirmed",
 "XLF-1W-distribution-2026-01-05T00-00-00Z-model1|confirmed",
+"XLM-USD-15m-accumulation-2026-11-24T03-00-00Z-model1|forming",
 "XLY-1D-accumulation-2026-07-23T04-00-00Z-model2-liquidity|potential"
 ]
