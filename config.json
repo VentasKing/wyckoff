@@ -17,7 +17,7 @@
     "require_ar_break_of_structure": false,
     "allow_nested_ranges": true,
     "trend_lookback": 50,
-    "max_opposite_deviations": 1
+    "max_opposite_deviations": 0
   },
   "alerts": {
     "tap3_potential": true,
