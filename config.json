@@ -2,22 +2,14 @@
   "stocks": {
     "enabled": true,
     "universe": "my list",
-    "tickers": ["SPY", "QQQ", "IWM", "DIA", "SMH", "XLK", "XLF", "XLE", "XLV", "XLY", "GLD", "SLV", "TLT",
-                "AAPL", "MSFT", "NVDA", "AMZN", "GOOGL", "META", "TSLA", "AVGO", "AMD", "NFLX", "ORCL", "CRM",
-                "ADBE", "INTC", "QCOM", "MU", "TXN", "AMAT", "LRCX", "KLAC", "ASML", "ARM", "TSM", "SMCI",
-                "PLTR", "SNOW", "CRWD", "PANW", "NET", "DDOG", "MDB", "SHOP", "UBER", "ABNB", "DASH", "COIN",
-                "MSTR", "HOOD", "PYPL", "SOFI", "JPM", "BAC", "GS", "MS", "WFC", "C", "V", "MA", "AXP", "SCHW",
-                "BRK.B", "UNH", "LLY", "JNJ", "PFE", "MRK", "ABBV", "ISRG", "XOM", "CVX", "COP", "OXY", "SLB",
-                "WMT", "COST", "TGT", "HD", "LOW", "MCD", "SBUX", "NKE", "DIS", "KO", "PEP", "PG", "BA", "CAT",
-                "DE", "GE", "LMT", "RTX", "F", "GM", "RIVN", "T", "VZ", "TMUS", "IBM"],
+    "tickers": ["SPY", "QQQ", "IWM", "DIA", "SMH", "XLK", "XLF", "XLE", "XLV", "XLY", "GLD", "SLV", "TLT", "AAPL", "MSFT", "NVDA", "AMZN", "GOOGL", "META", "TSLA", "AVGO", "AMD", "NFLX", "ORCL", "CRM", "ADBE", "INTC", "QCOM", "MU", "TXN", "AMAT", "LRCX", "KLAC", "ASML", "ARM", "TSM", "SMCI", "PLTR", "SNOW", "CRWD", "PANW", "NET", "DDOG", "MDB", "SHOP", "UBER", "ABNB", "DASH", "COIN", "MSTR", "HOOD", "PYPL", "SOFI", "JPM", "BAC", "GS", "MS", "WFC", "C", "V", "MA", "AXP", "SCHW", "BRK.B", "UNH", "LLY", "JNJ", "PFE", "MRK", "ABBV", "ISRG", "XOM", "CVX", "COP", "OXY", "SLB", "WMT", "COST", "TGT", "HD", "LOW", "MCD", "SBUX", "NKE", "DIS", "KO", "PEP", "PG", "BA", "CAT", "DE", "GE", "LMT", "RTX", "F", "GM", "RIVN", "T", "VZ", "TMUS", "IBM"],
     "timeframes": ["30m", "1h", "4h", "1D", "1W"],
     "feed": "sip"
   },
   "crypto": {
     "enabled": true,
     "universe": "my list",
-    "products": ["BTC-USD", "ETH-USD", "SOL-USD", "XRP-USD", "DOGE-USD", "QNT-USD", "ASTER-USD",
-                 "SAND-USD", "BCH-USD", "ETC-USD", "BAT-USD"],
+    "products": ["BTC-USD", "ETH-USD", "SOL-USD", "XRP-USD", "DOGE-USD", "QNT-USD", "ASTER-USD", "SAND-USD", "BCH-USD", "ETC-USD", "BAT-USD", "AVAX-USD", "PEPE-USD", "PENGU-USD", "ZECUSD-USD", "NEAR-USD", "ONDO-USD", "SUI-USD", "LINK-USD", "ADA-USD", "XLM-USD", "HBAR-USD", "LTC-USD", "AAVE-USD", "DOT-USD", "ENA-USD"],
     "timeframes": ["15m", "30m", "1h", "4h", "1D", "1W"]
   },
   "rules": {
@@ -29,7 +21,7 @@
   "alerts": {
     "tap3_potential": true,
     "tap3_confirmed": true,
-    "model1_forming": false,
+    "model1_forming": true,
     "max_bars_ago": 5
   },
   "display": {
