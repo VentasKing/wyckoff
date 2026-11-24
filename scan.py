@@ -365,7 +365,7 @@ def explain_symbol(symbol: str, tfs: list[str] | None = None) -> None:
     if not frames:
         print(f"No candles found for {symbol}.")
         return
-    explain(symbol, frames, cfg["rules"])
+    explain(symbol, frames, cfg["rules"], last=int(os.environ.get("EXPLAIN_LAST", "12")))
 
 
 if __name__ == "__main__":

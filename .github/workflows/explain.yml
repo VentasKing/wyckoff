@@ -12,6 +12,10 @@ on:
         description: "Timeframes (space-separated). Empty = the ones in config.json"
         required: false
         default: ""
+      last:
+        description: "How many recent candidates to list per timeframe"
+        required: false
+        default: "12"
 
 permissions:
   contents: read
@@ -37,4 +41,5 @@ jobs:
         env:
           APCA_API_KEY_ID: ${{ secrets.APCA_API_KEY_ID }}
           APCA_API_SECRET_KEY: ${{ secrets.APCA_API_SECRET_KEY }}
+          EXPLAIN_LAST: ${{ github.event.inputs.last }}
         run: python scan.py --explain "${{ github.event.inputs.symbol }}" "${{ github.event.inputs.timeframes }}"
