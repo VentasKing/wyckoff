@@ -92,6 +92,24 @@ h2{margin:0 0 10px;font-size:14px}
 .tags{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
 .tag{font-size:12px;font-family:var(--mono);background:#1A222D;border:1px solid #2B3542;padding:3px 7px;border-radius:6px}
 body.show-settings #dash{display:none}body.show-settings #settings{display:block}
+.fld{padding:10px 0;border-top:1px solid var(--line2)}.fld:first-of-type{border-top:0}
+.fld>label,.fld>.lbl{display:block;font-size:13px;font-weight:600;margin-bottom:6px}
+.fld .help{font-size:12px;color:var(--muted);margin-top:4px}
+.row{display:flex;justify-content:space-between;align-items:center;gap:16px}
+.inp,.sel{width:100%;height:38px;padding:0 10px;border-radius:8px;border:1px solid #2B3542;background:#0D1218;color:var(--text);font:13px Inter,system-ui,sans-serif}
+.inp:focus,.sel:focus{outline:2px solid var(--accent);outline-offset:1px}
+.num{width:90px}
+.sw{flex:none;position:relative;width:44px;height:26px;border-radius:999px;border:0;cursor:pointer;background:#2B3542}
+.sw::after{content:"";position:absolute;top:3px;left:3px;width:20px;height:20px;border-radius:50%;background:#9AA6B5;transition:left .12s}
+.sw[aria-checked=true]{background:var(--accent)}.sw[aria-checked=true]::after{left:21px;background:#071220}
+.tk{display:inline-flex;align-items:center;gap:2px;font-size:12px;font-family:var(--mono);background:#1A222D;border:1px solid #2B3542;padding:0 0 0 7px;border-radius:6px;height:28px}
+.tk button{border:0;background:none;color:var(--muted);cursor:pointer;width:26px;height:26px;font-size:15px;line-height:1}
+.tk button:hover{color:#F08C8C}
+.tklist{display:flex;flex-wrap:wrap;gap:6px;max-height:190px;overflow-y:auto;padding:2px}
+.addrow{display:flex;gap:8px;margin-top:8px}
+.status{font-size:13px;color:var(--muted)}.status.ok{color:#8BD5A6}.status.err{color:#F08C8C}.status.warn{color:#F3D59B}
+.steps{margin:8px 0 12px;padding-left:20px;font-size:13px;line-height:1.7}
+.toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#1E2733;border:1px solid #2B3542;color:var(--text);padding:10px 16px;border-radius:10px;font-size:13px;z-index:10;box-shadow:0 6px 24px rgba(0,0,0,.4)}
 @media (max-width:820px){
   header,.stats,.filters,main{padding-left:14px;padding-right:14px}
   .scaninfo{text-align:left}
@@ -141,15 +159,20 @@ body.show-settings #dash{display:none}body.show-settings #settings{display:block
 </div>
 
 <section id="settings" aria-label="Settings">
-  <div style="display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px;margin-bottom:16px">
+  <div style="display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px">
     <div style="display:flex;align-items:center;gap:14px">
       <a href="#" class="btn ghost">‹ Dashboard</a>
       <h1 style="margin:0;font-size:20px">Settings</h1>
     </div>
-    <a id="editcfg" class="btn primary" target="_blank" rel="noopener">Edit settings on GitHub ↗</a>
+    <div style="display:flex;flex-wrap:wrap;align-items:center;gap:10px">
+      <span class="status" id="savestatus" role="status"></span>
+      <button type="button" class="btn" id="savebtn" hidden>Save</button>
+      <button type="button" class="btn primary" id="savescan" hidden>Save &amp; scan now</button>
+    </div>
   </div>
-  <p class="muted" style="margin:0 0 16px;font-size:13px">Settings live in <span class="mono">config.json</span> in your GitHub repository. Edit it there and commit; the next scan uses the new settings.</p>
+  <div id="connect"></div>
   <div class="grid" id="cfggrid"></div>
+  <p class="muted" style="font-size:12px;margin-top:16px">Settings are stored in <span class="mono">config.json</span> in your repository · <a id="editcfg" target="_blank" rel="noopener">open it on GitHub ↗</a></p>
 </section>
 
 <script>
@@ -169,7 +192,7 @@ body.show-settings #dash{display:none}body.show-settings #settings{display:block
   $('#scannow').href = gh ? `${gh}/actions/workflows/scan.yml` : 'https://github.com';
   $('#editcfg').href = gh ? `${gh}/edit/main/config.json` : 'https://github.com';
 
-  let DATA = null, sel = null, chart = null;
+  let DATA = null, sel = null, chart = null, DATA_LOADED_ONCE = false;
   const F = { market: 'All', tfs: null, states: { potential: true, confirmed: true, forming: true, failed: false }, live: true };
   let dismissed = new Set(store.get('dismissed', []));
 
@@ -188,6 +211,8 @@ body.show-settings #dash{display:none}body.show-settings #settings{display:block
       DATA = { signals: [], markets: {}, config: null, generated_at: null };
     }
     if (!F.tfs) { F.tfs = {}; TF_ORDER.forEach((t) => (F.tfs[t] = true)); }
+    if (document.body.classList.contains('show-settings') && DATA_LOADED_ONCE) return;
+    DATA_LOADED_ONCE = true;
     render();
   }
 
@@ -270,7 +295,7 @@ body.show-settings #dash{display:none}body.show-settings #settings{display:block
     // selection from hash
     const id = decodeURIComponent(location.hash.slice(1));
     document.body.classList.toggle('show-settings', id === 'settings');
-    if (id === 'settings') { renderSettings(); return; }
+    if (id === 'settings') { renderSettings(true); return; }
     const found = DATA.signals.find((s) => s.id === id);
     sel = found || (window.innerWidth > 820 ? vis[0] : null) || null;
     document.body.classList.toggle('has-sel', !!found);
@@ -381,23 +406,243 @@ body.show-settings #dash{display:none}body.show-settings #settings{display:block
     chart.timeScale().fitContent();
   }
 
-  function renderSettings() {
-    const c = DATA.config;
-    const g = $('#cfggrid');
-    if (!c) { g.innerHTML = '<div class="card empty">Settings appear after the first scan.</div>'; return; }
+  // ------------------------------------------------------------ settings --
+  const API = gh ? `https://api.github.com/repos/${owner}/${repo}` : null;
+  let token = store.get('gh_token', '');
+  let draft = null, sha = null, cfgState = 'idle', cfgError = '', dirty = false, adding = {};
+  const UNI = { stocks: ['my list', 'most active 100', 'all US stocks'],
+                crypto: ['my list', 'top 25', 'top 50', 'top 100', 'top 200', 'all USD pairs'] };
+  const TZS = ['America/Los_Angeles', 'America/Denver', 'America/Chicago', 'America/New_York', 'UTC', 'Europe/London', 'Europe/Berlin', 'Asia/Tokyo', 'Australia/Sydney'];
+  const T2 = { either: 'Closes 25% back in, or closes inside twice (either)', quarter: 'Closes 25% back into the range',
+               two_closes: 'Closes inside the range twice in a row', close: 'Closes inside the range once' };
+  const b64e = (str) => btoa(unescape(encodeURIComponent(str)));
+  const b64d = (str) => decodeURIComponent(escape(atob(str.replace(/\n/g, ''))));
+  const getp = (o, path) => path.split('.').reduce((x, k) => (x == null ? x : x[k]), o);
+  const setp = (o, path, v) => { const ks = path.split('.'); const last = ks.pop(); ks.reduce((x, k) => x[k], o)[last] = v; };
+
+  function toast(msg) {
+    const t = document.createElement('div'); t.className = 'toast'; t.textContent = msg;
+    document.body.appendChild(t); setTimeout(() => t.remove(), 4500);
+  }
+
+  async function gfetch(path, opts = {}) {
+    return fetch(API + path, Object.assign({}, opts, { headers: Object.assign({
+      Authorization: `Bearer ${token}`, Accept: 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28' }, opts.headers || {}) }));
+  }
+
+  // config.json written compactly: lists of names on one line
+  function fmtConfig(c) {
+    const out = JSON.stringify(c, null, 2);
+    return out.replace(/\[\n\s+("[^"]*"(?:,\n\s+"[^"]*")*)\n\s+\]/g, (m, inner) => '[' + inner.replace(/,\n\s+/g, ', ') + ']') + '\n';
+  }
+
+  async function loadConfig() {
+    cfgState = 'loading'; renderSettings();
+    try {
+      const r = await gfetch('/contents/config.json?ref=main');
+      if (r.status === 401) throw new Error('GitHub didn’t accept this token. It may be mistyped or expired.');
+      if (r.status === 404 || r.status === 403) throw new Error(`This token can’t see ${owner}/${repo}. Give it access to the repository with Contents: Read and write.`);
+      if (!r.ok) throw new Error(`GitHub answered ${r.status}.`);
+      const j = await r.json();
+      sha = j.sha; draft = JSON.parse(b64d(j.content)); dirty = false; cfgState = 'ready'; cfgError = '';
+    } catch (e) { cfgState = 'error'; cfgError = e.message || String(e); }
+    renderSettings();
+  }
+
+  function validate(c) {
+    const errs = [];
+    for (const m of ['stocks', 'crypto']) {
+      const x = c[m];
+      if (!x.enabled) continue;
+      if (!x.timeframes.length) errs.push(`${m === 'stocks' ? 'Stocks' : 'Crypto'}: pick at least one timeframe.`);
+      const list = m === 'stocks' ? x.tickers : x.products;
+      if (x.universe === 'my list' && !list.length) errs.push(`${m === 'stocks' ? 'Stocks' : 'Crypto'}: “my list” is empty.`);
+    }
+    const n = (v, lo, hi, name) => { if (!(Number.isInteger(v) && v >= lo && v <= hi)) errs.push(`${name} must be a whole number from ${lo} to ${hi}.`); };
+    n(c.rules.trend_lookback ?? 50, 0, 500, 'Trend lookback');
+    n(c.alerts.max_bars_ago, 0, 100, 'Alert window');
+    n(c.display.history_days, 1, 60, 'History days');
+    return errs;
+  }
+
+  async function startScan() {
+    const r = await gfetch('/actions/workflows/scan.yml/dispatches', { method: 'POST',
+      headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ref: 'main', inputs: { markets: 'stocks,crypto' } }) });
+    return r.status === 204;
+  }
+
+  async function saveConfig(scan) {
+    const errs = validate(draft);
+    const st = $('#savestatus');
+    if (errs.length) { st.className = 'status err'; st.textContent = errs[0]; return; }
+    st.className = 'status'; st.textContent = 'Saving…';
+    try {
+      const r = await gfetch('/contents/config.json', { method: 'PUT', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: 'Update settings from the dashboard', content: b64e(fmtConfig(draft)), sha, branch: 'main' }) });
+      if (r.status === 409 || r.status === 422) { st.className = 'status err'; st.textContent = 'Settings changed elsewhere. Reload settings and try again.'; return; }
+      if (r.status === 403 || r.status === 404) { st.className = 'status err'; st.textContent = 'This token can read but not save. Give it Contents: Read and write.'; return; }
+      if (!r.ok) throw new Error(`GitHub answered ${r.status}`);
+      sha = (await r.json()).content.sha; dirty = false;
+      st.className = 'status ok'; st.textContent = 'Saved. The next scan uses these settings.';
+      if (scan) {
+        const ok = await startScan();
+        st.className = ok ? 'status ok' : 'status warn';
+        st.textContent = ok ? 'Saved, and a scan has started. Results in a few minutes.' : 'Saved, but couldn’t start a scan: give the token Actions: Read and write.';
+      }
+      renderSettings(true);
+    } catch (e) { st.className = 'status err'; st.textContent = 'Couldn’t save: ' + (e.message || e); }
+  }
+
+  function connectCard() {
+    if (!gh) return '<div class="card" style="margin-bottom:16px"><b>Editing works on your GitHub Pages address</b><div class="muted" style="font-size:13px;margin-top:4px">Open the dashboard at https://&lt;your-name&gt;.github.io/&lt;repo&gt;/ to edit settings here.</div></div>';
+    if (token && cfgState !== 'error') return '';
+    return `<div class="card" style="margin-bottom:16px;max-width:760px">
+      <h2 style="font-size:16px">Edit settings from here</h2>
+      <div class="muted" style="font-size:13px">Connect this browser to your repository once with a GitHub access token. It stays only in this browser on this device.</div>
+      ${cfgState === 'error' ? `<div class="status err" style="margin-top:10px">${esc(cfgError)}</div>` : ''}
+      <ol class="steps">
+        <li>Open <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">GitHub → new fine-grained token ↗</a></li>
+        <li>Name it “Tap Scanner dashboard” and pick an expiration (for example 1 year).</li>
+        <li><b>Repository access:</b> Only select repositories → <span class="mono">${esc(repo)}</span></li>
+        <li><b>Permissions → Repository permissions:</b> <b>Contents</b>: Read and write, and <b>Actions</b>: Read and write (for “Scan now”).</li>
+        <li>Click <b>Generate token</b>, copy it and paste it below.</li>
+      </ol>
+      <div class="addrow"><label for="tokin" style="position:absolute;left:-9999px">GitHub token</label>
+        <input id="tokin" class="inp mono" type="password" autocomplete="off" placeholder="github_pat_…">
+        <button type="button" class="btn primary" id="tokbtn">Connect</button></div>
+    </div>`;
+  }
+
+  function tfChips(path) {
+    const on = new Set(getp(draft, path));
+    return `<div class="tags">${TF_ORDER.map((t) => `<button type="button" class="chip" data-tf="${path}" data-v="${t}" aria-pressed="${on.has(t)}">${t}</button>`).join('')}</div>`;
+  }
+  function sw(path, label, help) {
+    return `<div class="fld"><div class="row"><div><div style="font-size:13px;font-weight:600">${label}</div>${help ? `<div class="help">${help}</div>` : ''}</div>
+      <button type="button" class="sw" role="switch" aria-label="${esc(label)}" data-sw="${path}" aria-checked="${!!getp(draft, path)}"></button></div></div>`;
+  }
+  function selField(path, label, opts, names) {
+    const v = getp(draft, path), id = 'f-' + path.replace(/\./g, '-');
+    const all = opts.includes(v) ? opts : [v, ...opts];
+    return `<div class="fld"><label for="${id}">${label}</label><select class="sel" id="${id}" data-sel="${path}">${all.map((o) =>
+      `<option value="${esc(o)}"${o === v ? ' selected' : ''}>${esc(names ? names[o] || o : o)}</option>`).join('')}</select></div>`;
+  }
+  function numf(path, label, help, dflt) {
+    const id = 'f-' + path.replace(/\./g, '-');
+    return `<div class="fld"><div class="row"><div><label for="${id}" style="font-size:13px;font-weight:600">${label}</label>${help ? `<div class="help">${help}</div>` : ''}</div>
+      <input id="${id}" class="inp num mono" type="number" min="0" step="1" data-num="${path}" value="${getp(draft, path) ?? dflt}"></div></div>`;
+  }
+  function listf(market, path, label, placeholder) {
+    const xs = getp(draft, path) || [];
+    const miss = (DATA.markets && DATA.markets[market] && DATA.markets[market].missing) || [];
+    return `<div class="fld"><div class="lbl">${label} · ${xs.length}</div>
+      <div class="tklist">${xs.map((x) => `<span class="tk"${miss.includes(x) ? ' style="border-color:#8A4B4B"' : ''}>${esc(x)}<button type="button" aria-label="Remove ${esc(x)}" data-rm="${path}" data-v="${esc(x)}">×</button></span>`).join('')}</div>
+      ${miss.length ? `<div class="help" style="color:#F08C8C">Not found on the last scan: ${esc(miss.join(' '))}</div>` : ''}
+      <div class="addrow"><label for="add-${market}" style="position:absolute;left:-9999px">Add to ${label}</label>
+        <input id="add-${market}" class="inp mono" placeholder="${placeholder}" value="${esc(adding[market] || '')}" data-addin="${market}">
+        <button type="button" class="btn" data-add="${path}" data-m="${market}">Add</button></div>
+      <div class="help">Separate several with spaces or commas.</div></div>`;
+  }
+
+  function readonlySettings(c) {
     const kv = (k, v) => `<div class="kv"><span>${k}</span><span>${v}</span></div>`;
     const tags = (xs) => `<div class="tags">${xs.map((x) => `<span class="tag">${esc(x)}</span>`).join('')}</div>`;
     const yes = (b) => (b ? 'On' : 'Off');
-    const t2 = { either: 'Closes 25% back in, or closes inside twice', quarter: 'Closes 25% back into the range', two_closes: 'Closes inside twice in a row', close: 'Closes inside once' }[c.rules.tap2_return] || c.rules.tap2_return;
-    g.innerHTML = `
-      <div class="card"><h2>Stocks</h2>${kv('Scanning', c.stocks.enabled ? esc(c.stocks.universe) : 'Off')}${kv('Timeframes', esc(c.stocks.timeframes.join(' · ')))}${kv('Data', 'Alpaca free tier, ~15 min delayed')}
+    return `
+      <div class="card"><h2>Stocks</h2>${kv('Scanning', c.stocks.enabled ? esc(c.stocks.universe) : 'Off')}${kv('Timeframes', esc(c.stocks.timeframes.join(' · ')))}
         <div class="muted" style="font-size:12px;margin-top:8px">My list · ${c.stocks.tickers.length} tickers</div>${tags(c.stocks.tickers)}</div>
-      <div class="card"><h2>Crypto</h2>${kv('Scanning', c.crypto.enabled ? esc(c.crypto.universe) : 'Off')}${kv('Timeframes', esc(c.crypto.timeframes.join(' · ')))}${kv('Data', 'Coinbase spot, free')}
+      <div class="card"><h2>Crypto</h2>${kv('Scanning', c.crypto.enabled ? esc(c.crypto.universe) : 'Off')}${kv('Timeframes', esc(c.crypto.timeframes.join(' · ')))}
         <div class="muted" style="font-size:12px;margin-top:8px">My list · ${c.crypto.products.length} coins</div>${tags(c.crypto.products)}</div>
-      <div class="card"><h2>Model rules</h2>${kv('Tap 2 is complete when price…', esc(t2))}${kv('Require the AR to break structure', yes(c.rules.require_ar_break_of_structure))}${kv('Allow ranges inside larger ranges', yes(c.rules.allow_nested_ranges))}${kv('Tap 1 must close beyond every close of the last', (c.rules.trend_lookback ?? 50) + ' candles')}</div>
-      <div class="card"><h2>Phone alerts</h2>${kv('Tap 3 potential', yes(c.alerts.tap3_potential))}${kv('Tap 3 confirmed', yes(c.alerts.tap3_confirmed))}${kv('Model 1 forming', yes(c.alerts.model1_forming))}${kv('Only taps from the last', c.alerts.max_bars_ago + ' bars')}${kv('Time zone', esc(c.display.timezone))}
-        <div class="muted" style="font-size:12px;margin-top:8px">Alerts go to your ntfy topic, kept in the repository's secrets (NTFY_TOPIC).</div></div>`;
+      <div class="card"><h2>Model rules</h2>${kv('Tap 2 is complete when price…', esc(T2[c.rules.tap2_return] || c.rules.tap2_return))}${kv('Require the AR to break structure', yes(c.rules.require_ar_break_of_structure))}${kv('Allow ranges inside larger ranges', yes(c.rules.allow_nested_ranges))}${kv('Tap 1 must close beyond every close of the last', (c.rules.trend_lookback ?? 50) + ' candles')}</div>
+      <div class="card"><h2>Phone alerts</h2>${kv('Tap 3 potential', yes(c.alerts.tap3_potential))}${kv('Tap 3 confirmed', yes(c.alerts.tap3_confirmed))}${kv('Model 1 forming', yes(c.alerts.model1_forming))}${kv('Only taps from the last', c.alerts.max_bars_ago + ' bars')}${kv('Time zone', esc(c.display.timezone))}</div>`;
   }
+
+  function renderSettings(keepStatus) {
+    $('#connect').innerHTML = connectCard();
+    const g = $('#cfggrid');
+    const editing = gh && token && cfgState === 'ready' && draft;
+    $('#savebtn').hidden = $('#savescan').hidden = !editing;
+    if (!keepStatus) { const st = $('#savestatus'); st.className = dirty ? 'status warn' : 'status'; st.textContent = dirty ? 'Unsaved changes' : ''; }
+    if (gh && token && cfgState === 'idle') { loadConfig(); return; }
+    if (cfgState === 'loading') { g.innerHTML = '<div class="card empty">Loading your settings from GitHub…</div>'; return; }
+    if (!editing) {
+      g.innerHTML = DATA.config ? readonlySettings(DATA.config) : '<div class="card empty">Settings appear after the first scan.</div>';
+      bindConnect(); return;
+    }
+    const d = draft;
+    d.rules.trend_lookback = d.rules.trend_lookback ?? 50;
+    g.innerHTML = `
+      <div class="card"><h2>Stocks</h2><div class="muted" style="font-size:12px;margin-top:-6px">Alpaca free tier, ~15 min delayed · weekdays 9:00–17:00 New York</div>
+        ${sw('stocks.enabled', 'Scan stocks')}
+        ${selField('stocks.universe', 'What to scan', UNI.stocks)}
+        ${listf('stocks', 'stocks.tickers', 'My list', 'AMD, NFLX…')}
+        <div class="fld"><div class="lbl">Timeframes</div>${tfChips('stocks.timeframes')}</div></div>
+      <div class="card"><h2>Crypto</h2><div class="muted" style="font-size:12px;margin-top:-6px">Coinbase spot, USD pairs · around the clock</div>
+        ${sw('crypto.enabled', 'Scan crypto')}
+        ${selField('crypto.universe', 'What to scan', UNI.crypto)}
+        ${listf('crypto', 'crypto.products', 'My list', 'LINK, AVAX-USD…')}
+        <div class="fld"><div class="lbl">Timeframes</div>${tfChips('crypto.timeframes')}</div></div>
+      <div class="card"><h2>Model rules</h2>
+        ${selField('rules.tap2_return', 'Tap 2 is complete when price…', Object.keys(T2), T2)}
+        ${sw('rules.require_ar_break_of_structure', 'Require the AR to break structure', 'Off: keep these ranges and flag them')}
+        ${sw('rules.allow_nested_ranges', 'Allow ranges inside larger ranges', 'On: keep them and flag them')}
+        ${numf('rules.trend_lookback', 'Trend lookback (candles)', 'Tap 1 must close beyond every close of this many candles. 0 turns it off.', 50)}</div>
+      <div class="card"><h2>Phone alerts</h2>
+        ${sw('alerts.tap3_potential', 'Tap 3 potential', 'An extreme level or zone was hit')}
+        ${sw('alerts.tap3_confirmed', 'Tap 3 confirmed', 'Structure broke after the tap')}
+        ${sw('alerts.model1_forming', 'Model 1 forming', 'Price is deviating the tap 2 extreme')}
+        ${numf('alerts.max_bars_ago', 'Only alert for taps from the last (candles)', '', 5)}
+        ${selField('display.timezone', 'Time zone', TZS)}
+        ${numf('display.history_days', 'Days of history in “All setups”', '', 14)}
+        <div class="fld"><button type="button" class="btn ghost" id="disconnect">Disconnect this browser</button></div></div>`;
+    bindEditing();
+  }
+
+  function changed() { dirty = true; renderSettings(); }
+
+  function bindConnect() {
+    const b = $('#tokbtn');
+    if (!b) return;
+    const go = () => { const v = $('#tokin').value.trim(); if (!v) return; token = v; store.set('gh_token', v); cfgState = 'idle'; renderSettings(); };
+    b.onclick = go; $('#tokin').onkeydown = (e) => { if (e.key === 'Enter') go(); };
+  }
+
+  function bindEditing() {
+    const g = $('#cfggrid');
+    g.querySelectorAll('[data-sw]').forEach((el) => el.onclick = () => { setp(draft, el.dataset.sw, !getp(draft, el.dataset.sw)); changed(); });
+    g.querySelectorAll('[data-sel]').forEach((el) => el.onchange = () => { setp(draft, el.dataset.sel, el.value); changed(); });
+    g.querySelectorAll('[data-num]').forEach((el) => el.onchange = () => { setp(draft, el.dataset.num, parseInt(el.value, 10)); changed(); });
+    g.querySelectorAll('[data-tf]').forEach((el) => el.onclick = () => {
+      const cur = new Set(getp(draft, el.dataset.tf)); cur.has(el.dataset.v) ? cur.delete(el.dataset.v) : cur.add(el.dataset.v);
+      setp(draft, el.dataset.tf, TF_ORDER.filter((t) => cur.has(t))); changed(); });
+    g.querySelectorAll('[data-rm]').forEach((el) => el.onclick = () => {
+      setp(draft, el.dataset.rm, getp(draft, el.dataset.rm).filter((x) => x !== el.dataset.v)); changed(); });
+    g.querySelectorAll('[data-addin]').forEach((el) => {
+      el.oninput = () => { adding[el.dataset.addin] = el.value; };
+      el.onkeydown = (e) => { if (e.key === 'Enter') g.querySelector(`[data-add][data-m="${el.dataset.addin}"]`).click(); };
+    });
+    g.querySelectorAll('[data-add]').forEach((el) => el.onclick = () => {
+      const m = el.dataset.m, raw = (adding[m] || '').toUpperCase().split(/[\s,]+/).filter(Boolean);
+      const norm = raw.map((x) => m === 'crypto' && !x.includes('-') ? x + '-USD' : x).filter((x) => /^[A-Z0-9.\-]{1,20}$/.test(x));
+      const cur = getp(draft, el.dataset.add);
+      setp(draft, el.dataset.add, cur.concat(norm.filter((x) => !cur.includes(x))));
+      adding[m] = ''; changed();
+      const inp = $(`#add-${m}`); if (inp) inp.focus();
+    });
+    const dc = $('#disconnect');
+    if (dc) dc.onclick = () => { if (dirty && !confirm('Discard unsaved changes?')) return;
+      token = ''; store.set('gh_token', ''); draft = null; sha = null; cfgState = 'idle'; dirty = false; renderSettings(); };
+  }
+
+  $('#savebtn').onclick = () => saveConfig(false);
+  $('#savescan').onclick = () => saveConfig(true);
+  window.addEventListener('beforeunload', (e) => { if (dirty) { e.preventDefault(); e.returnValue = ''; } });
+  $('#scannow').addEventListener('click', async (e) => {
+    if (!token || !API) return;               // no token: the link opens GitHub's Run workflow page
+    e.preventDefault();
+    try { toast((await startScan()) ? 'Scan started. Results in a few minutes.' : 'Couldn’t start a scan: the token needs Actions: Read and write.'); }
+    catch (err) { toast('Couldn’t start a scan.'); }
+  });
 
   window.addEventListener('hashchange', () => { render(); window.scrollTo(0, 0); });
   let wide = window.innerWidth > 820;

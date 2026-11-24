@@ -165,6 +165,8 @@ def scan_stocks(cfg) -> tuple[list[dict], dict]:
         universe = [byname[s] for s in want if s in byname]
         if missing:
             print("stocks not found:", " ".join(missing))
+    else:
+        missing = []
     cache = BarCache(str(ROOT / ".bar_cache"))
     syms = [u["symbol"] for u in universe]
     for src in sorted({TF_SOURCE[t] for t in sc["timeframes"]}):
@@ -182,7 +184,7 @@ def scan_stocks(cfg) -> tuple[list[dict], dict]:
             sigs += signal_records("stocks", u["symbol"], u["tv"], frames, ranges, cfg)
         except Exception as e:  # noqa: BLE001
             print(f"  {u['symbol']}: {e}")
-    return sigs, {"symbols": len(syms)}
+    return sigs, {"symbols": len(syms), "missing": missing}
 
 
 def scan_crypto(cfg) -> tuple[list[dict], dict]:
@@ -198,6 +200,7 @@ def scan_crypto(cfg) -> tuple[list[dict], dict]:
         if missing:
             print("crypto not found on Coinbase spot:", " ".join(missing))
     else:
+        missing = []
         n = None if uni == "all USD pairs" else int(uni.split()[1])
         prods = coinbase_top_products(n, products=allp)
     sigs = []
@@ -212,7 +215,7 @@ def scan_crypto(cfg) -> tuple[list[dict], dict]:
             sigs += signal_records("crypto", p["product_id"], coinbase_tv_symbol(p), frames, ranges, cfg)
         except Exception as e:  # noqa: BLE001
             print(f"  {p['product_id']}: {e}")
-    return sigs, {"symbols": len(prods)}
+    return sigs, {"symbols": len(prods), "missing": missing}
 
 
 # ---------------------------------------------------------------- alerts ---
@@ -318,6 +321,7 @@ def main(now: datetime | None = None, opener=None) -> dict:
             sigs, info = fn(cfg)
             signals[name] = sigs
             markets[name] = {"scanned_at": iso(now), "symbols": info["symbols"], "signals": len(sigs),
+                             "missing": info.get("missing", []),
                              "seconds": round(time.time() - t0, 1), "error": None}
         except Exception as e:  # noqa: BLE001
             traceback.print_exc()

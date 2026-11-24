@@ -96,3 +96,9 @@ def test_market_error_is_recorded_not_fatal(sandbox, monkeypatch):
 def test_topic_accepts_full_address():
     for t in ["wyckoff", "ntfy.sh/wyckoff", "https://ntfy.sh/wyckoff", " https://ntfy.sh/wyckoff/ "]:
         assert scan.clean_topic(t) == "wyckoff"
+
+
+def test_missing_symbols_are_reported(sandbox):
+    out = scan.main(now=datetime(2026, 11, 23, 17, 0, tzinfo=timezone.utc))
+    assert out["markets"]["crypto"]["missing"] == ["NOPE-USD"]
+    assert out["markets"]["stocks"]["missing"] == []

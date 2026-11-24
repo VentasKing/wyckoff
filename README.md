@@ -39,8 +39,11 @@ flood. From then on you get alerts for new ones.
 ## Day to day
 
 - **Scan now:** the dashboard button opens the Run workflow page.
-- **Change settings:** the dashboard's settings page has an *Edit settings on GitHub* button.
-  Edit `config.json`, then **Commit changes**. The next scan uses the new settings.
+- **Change settings:** on the dashboard's settings page. The first time, connect the browser
+  with a GitHub fine-grained token (the page shows the steps): *Only select repositories* →
+  this repository, with **Contents: Read and write** and **Actions: Read and write**. The token
+  stays in that browser only. Then add or remove tickers and coins, switch timeframes and
+  rules, and press **Save** or **Save & scan now**. You can also edit `config.json` on GitHub.
 - **Stocks** are scanned on weekdays from 9:00 to 17:00 New York time. Outside those hours
   the dashboard keeps the last results. **Crypto** is scanned around the clock.
 - **Pause everything:** Actions → Scan → **⋯ → Disable workflow**.
