@@ -117,6 +117,8 @@ body.show-settings #dash{display:none}body.show-settings #settings{display:block
 .spin{width:12px;height:12px;border-radius:50%;border:2px solid #4C9EFF;border-right-color:transparent;animation:spin .8s linear infinite}
 @keyframes spin{to{transform:rotate(360deg)}}
 @media (prefers-reduced-motion:reduce){.topnote{transition:none}.spin{animation:none}}
+.donebadge{font-size:11px;font-weight:600;color:#8BD5A6;border:1px solid #24503A;background:#13261B;padding:2px 7px;border-radius:999px}
+.toast button{margin-left:10px;border:0;background:none;color:#7DB8FF;font-weight:700;cursor:pointer;padding:4px 6px}
 .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#1E2733;border:1px solid #2B3542;color:var(--text);padding:10px 16px;border-radius:10px;font-size:13px;z-index:10;box-shadow:0 6px 24px rgba(0,0,0,.4)}
 @media (max-width:820px){
   header,.stats,.filters,main{padding-left:14px;padding-right:14px}
@@ -156,13 +158,13 @@ body.show-settings #dash{display:none}body.show-settings #settings{display:block
     <div class="fgroup" id="f-market"><span>Market</span></div>
     <div class="fgroup" id="f-tf"><span>Timeframe</span></div>
     <div class="fgroup" id="f-state"><span>Tap 3</span></div>
-    <div class="fgroup"><button type="button" class="chip" id="f-live" aria-pressed="true">Live only</button></div>
+    <div class="fgroup"><button type="button" class="chip" id="f-live" aria-pressed="true">Live only</button>
+      <button type="button" class="chip" id="f-done" aria-pressed="false">Done</button></div>
   </section>
   <main>
     <section class="list" aria-label="Signals">
       <div class="listhead"><div><b id="listtitle">Live setups</b> <span class="muted" id="listcount"></span></div><span class="muted" style="font-size:12px">Newest first</span></div>
       <div class="rows" id="rows"></div>
-      <div id="dismissedNote" class="muted" style="font-size:12px;padding:10px 14px;display:none"></div>
     </section>
     <section class="detail" id="detail" aria-label="Selected setup"></section>
   </main>
@@ -203,8 +205,12 @@ body.show-settings #dash{display:none}body.show-settings #settings{display:block
   $('#editcfg').href = gh ? `${gh}/edit/main/config.json` : 'https://github.com';
 
   let DATA = null, sel = null, chart = null, DATA_LOADED_ONCE = false;
-  const F = { market: 'All', tfs: null, states: { potential: true, confirmed: true, forming: true, failed: false }, live: true };
-  let dismissed = new Set(store.get('dismissed', []));
+  const F = { market: 'All', tfs: null, states: { potential: true, confirmed: true, forming: true, failed: false }, live: true, showDone: false };
+  // "done" marks: id -> {d: true|false, t: iso}; the latest change wins when devices merge
+  let marks = store.get('done_marks', {});
+  for (const id of store.get('dismissed', [])) if (!marks[id]) marks[id] = { d: true, t: new Date().toISOString() };
+  store.set('dismissed', []); store.set('done_marks', marks);
+  const isDone = (id) => !!(marks[id] && marks[id].d);
 
   const tz = () => (DATA && DATA.config && DATA.config.display && DATA.config.display.timezone) || Intl.DateTimeFormat().resolvedOptions().timeZone;
   const fmt = (iso, opts) => iso ? new Intl.DateTimeFormat('en-US', Object.assign({ timeZone: tz() }, opts)).format(new Date(iso)) : '';
@@ -236,6 +242,7 @@ body.show-settings #dash{display:none}body.show-settings #settings{display:block
   }
 
   async function load() {
+    const marksChanged = await pullMarks();
     let fresh = null;
     try {
       const r = await fetch('data/signals.json?t=' + Date.now(), { cache: 'no-store' });
@@ -248,7 +255,7 @@ body.show-settings #dash{display:none}body.show-settings #settings{display:block
       const isNew = lastGen !== null && fresh.generated_at && fresh.generated_at !== lastGen;
       DATA = fresh;
       if (fresh.generated_at) lastGen = fresh.generated_at;
-      if (!isNew && DATA_LOADED_ONCE) { refreshScanInfo(); return; }      // nothing new: don't redraw
+      if (!isNew && DATA_LOADED_ONCE && !marksChanged) { refreshScanInfo(); return; }      // nothing new: don't redraw
       if (isNew) {
         const live = fresh.signals.filter((x) => x.live).length;
         const errs = Object.values(fresh.markets || {}).filter((m) => m.error && m.error_at === fresh.generated_at).length;
@@ -272,7 +279,7 @@ body.show-settings #dash{display:none}body.show-settings #settings{display:block
 
   function visible() {
     return DATA.signals.filter((s) => (F.market === 'All' || s.market === F.market.toLowerCase()) &&
-      F.tfs[s.tf] !== false && F.states[s.state] && (!F.live || s.live) && !dismissed.has(s.id));
+      F.tfs[s.tf] !== false && F.states[s.state] && (!F.live || s.live) && (F.showDone ? isDone(s.id) : !isDone(s.id)));
   }
 
   function chips(el, items) {
@@ -309,6 +316,10 @@ body.show-settings #dash{display:none}body.show-settings #settings{display:block
     chips($('#f-state'), STATES.filter((s) => s !== 'failed' || !F.live).map((s) => [NICE[s], !!F.states[s], () => { F.states[s] = !F.states[s]; render(); }]));
     $('#f-live').setAttribute('aria-pressed', F.live);
     $('#f-live').onclick = () => { F.live = !F.live; if (F.live) F.states.failed = false; render(); };
+    const nDone = DATA.signals.filter((x) => isDone(x.id)).length;
+    $('#f-done').textContent = nDone ? `Done · ${nDone}` : 'Done';
+    $('#f-done').setAttribute('aria-pressed', F.showDone);
+    $('#f-done').onclick = () => { F.showDone = !F.showDone; history.replaceState('', document.title, location.pathname + location.search); render(); };
 
     const vis = visible();
     // stats
@@ -321,27 +332,22 @@ body.show-settings #dash{display:none}body.show-settings #settings{display:block
     ].map(([l, v, c]) => `<div class="stat"><div class="muted" style="font-size:12px">${l}</div><div class="v">${v}<span class="dot" style="background:${c}"></span></div></div>`).join('');
 
     // list
-    $('#listtitle').textContent = F.live ? 'Live setups' : 'All setups (last 14 days)';
+    $('#listtitle').textContent = F.showDone ? 'Marked done' : F.live ? 'Live setups' : 'All setups (last 14 days)';
     $('#listcount').textContent = '· ' + vis.length;
     const rows = $('#rows');
     if (!DATA.generated_at) rows.innerHTML = '<div class="empty">No scan results yet. The first scan runs within 30 minutes of setup, or press “Scan now”.</div>';
-    else if (!vis.length) rows.innerHTML = '<div class="empty">No setups match these filters.</div>';
+    else if (!vis.length) rows.innerHTML = `<div class="empty">${F.showDone ? 'Nothing marked done yet.' : 'No setups match these filters.'}</div>`;
     else rows.innerHTML = vis.map((s) => `
       <button type="button" class="sig" data-id="${esc(s.id)}" aria-current="${sel && sel.id === s.id}">
         <div class="r1"><span style="display:flex;align-items:center;gap:8px;min-width:0">
           <span class="${s.side === 'accumulation' ? 'side-a' : 'side-d'}">${s.side === 'accumulation' ? '▲' : '▼'}</span>
           <span class="sym">${esc(s.symbol)}</span><span class="tf">${esc(s.tf)}</span>
           <span class="muted" style="font-size:11px">${s.market === 'stocks' ? 'Stock' : 'Crypto'}</span></span>
-          <span class="state st-${s.state}">${NICE[s.state]}</span></div>
+          ${isDone(s.id) ? '<span class="donebadge">✓ Done</span>' : `<span class="state st-${s.state}">${NICE[s.state]}</span>`}</div>
         <div class="r2"><span style="color:var(--soft)">${esc(s.model_name)}${s.level_tf ? ' (' + esc(s.level_tf) + ')' : ''}</span><span class="muted">${s.bars_ago === 0 ? 'this bar' : s.bars_ago + ' bar' + (s.bars_ago === 1 ? '' : 's') + ' ago'}</span></div>
         <div class="r3"><span>${s.level != null ? 'level ' + num(s.level) : s.stop != null ? 'stop ' + num(s.stop) : ''}</span>${s.flags.length ? `<span style="color:var(--amber)">⚑ ${s.flags.length}</span>` : ''}</div>
       </button>`).join('');
     rows.querySelectorAll('.sig').forEach((el) => el.onclick = () => { location.hash = el.dataset.id; });
-    const nd = DATA.signals.filter((s) => dismissed.has(s.id)).length;
-    const dn = $('#dismissedNote');
-    dn.style.display = nd ? 'block' : 'none';
-    dn.innerHTML = nd ? `${nd} dismissed · <a href="#" id="undismiss">show again</a>` : '';
-    if (nd) $('#undismiss').onclick = (e) => { e.preventDefault(); dismissed = new Set(); store.set('dismissed', []); render(); };
 
     // selection from hash
     const id = decodeURIComponent(location.hash.slice(1));
@@ -377,7 +383,7 @@ body.show-settings #dash{display:none}body.show-settings #settings{display:block
           </div>
           <div class="btns" style="display:flex;gap:8px;flex-wrap:wrap">
             <a class="btn" href="${esc(s.tv)}" target="_blank" rel="noopener">Open in TradingView ↗</a>
-            <button type="button" class="btn ghost" id="dismissbtn">Dismiss</button>
+            <button type="button" class="btn ${isDone(s.id) ? 'ghost' : ''}" id="donebtn">${isDone(s.id) ? 'Undo done' : '✓ Done'}</button>
           </div>
         </div>
         <div id="chart" role="img" aria-label="${esc(s.tf)} chart of ${esc(s.symbol)} with the range and taps marked"></div>
@@ -405,7 +411,14 @@ body.show-settings #dash{display:none}body.show-settings #settings{display:block
         </div>
       </div>`;
     $('#backbtn').onclick = () => { history.pushState('', document.title, location.pathname + location.search); render(); window.scrollTo(0, 0); };
-    $('#dismissbtn').onclick = () => { dismissed.add(s.id); store.set('dismissed', [...dismissed]); history.replaceState('', document.title, location.pathname + location.search); render(); };
+    $('#donebtn').onclick = () => {
+      const wasDone = isDone(s.id);
+      setDone(s.id, !wasDone);
+      history.replaceState('', document.title, location.pathname + location.search);
+      render();
+      if (!wasDone) toast(`${s.symbol} ${s.tf} marked done`, 'Undo', () => { setDone(s.id, false); location.hash = s.id; render(); });
+      else toast(`${s.symbol} ${s.tf} is back in the queue`);
+    };
     drawChart(s);
   }
 
@@ -471,9 +484,63 @@ body.show-settings #dash{display:none}body.show-settings #settings{display:block
   const getp = (o, path) => path.split('.').reduce((x, k) => (x == null ? x : x[k]), o);
   const setp = (o, path, v) => { const ks = path.split('.'); const last = ks.pop(); ks.reduce((x, k) => x[k], o)[last] = v; };
 
-  function toast(msg) {
-    const t = document.createElement('div'); t.className = 'toast'; t.textContent = msg;
-    document.body.appendChild(t); setTimeout(() => t.remove(), 4500);
+  function toast(msg, actionLabel, action) {
+    document.querySelectorAll('.toast').forEach((x) => x.remove());
+    const t = document.createElement('div'); t.className = 'toast'; t.setAttribute('role', 'status'); t.textContent = msg;
+    if (actionLabel) {
+      const b = document.createElement('button'); b.type = 'button'; b.textContent = actionLabel;
+      b.onclick = () => { t.remove(); action(); }; t.appendChild(b);
+    }
+    document.body.appendChild(t); setTimeout(() => t.remove(), actionLabel ? 7000 : 4500);
+  }
+
+  // ------------------------------------------------- done marks: sync ----
+  const DONE_FILE = 'docs/data/reviewed.json';
+  let doneTimer = null, doneSha = null;
+
+  function mergeMarks(remote) {
+    let changed = false;
+    for (const [id, m] of Object.entries(remote || {})) {
+      if (!marks[id] || (m.t > marks[id].t)) { marks[id] = m; changed = true; }
+    }
+    if (changed) store.set('done_marks', marks);
+    return changed;
+  }
+
+  function setDone(id, d) {
+    marks[id] = { d, t: new Date().toISOString() };
+    store.set('done_marks', marks);
+    if (token && API) { clearTimeout(doneTimer); doneTimer = setTimeout(() => pushMarks(1), 1500); }
+  }
+
+  async function pullMarks() {       // public copy published with the dashboard
+    try {
+      const r = await fetch('data/reviewed.json?t=' + Date.now(), { cache: 'no-store' });
+      if (r.ok && mergeMarks((await r.json()).marks)) return true;
+    } catch (e) {}
+    return false;
+  }
+
+  async function pushMarks(retries) {
+    try {
+      let remote = {};
+      const g = await gfetch('/contents/' + DONE_FILE + '?ref=main');
+      if (g.ok) { const j = await g.json(); doneSha = j.sha; remote = JSON.parse(b64d(j.content)).marks || {}; }
+      else if (g.status === 404) doneSha = null;
+      else throw new Error(g.status);
+      mergeMarks(remote);
+      const cutoff = new Date(Date.now() - 90 * 864e5).toISOString();
+      const keep = Object.fromEntries(Object.entries(marks).filter(([, m]) => m.t >= cutoff));
+      const body = { message: 'Update done marks from the dashboard', branch: 'main',
+        content: b64e(JSON.stringify({ marks: keep }) + '\n') };
+      if (doneSha) body.sha = doneSha;
+      const r = await gfetch('/contents/' + DONE_FILE, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+      if ((r.status === 409 || r.status === 422) && retries > 0) return pushMarks(retries - 1);
+      if (!r.ok) throw new Error(r.status);
+      doneSha = (await r.json()).content.sha;
+    } catch (e) {
+      toast('Couldn’t sync “done” to GitHub. It’s saved on this device.');
+    }
   }
 
   async function gfetch(path, opts = {}) {

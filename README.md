@@ -38,7 +38,10 @@ flood. From then on you get alerts for new ones.
 
 ## Day to day
 
-- **Scan now:** the dashboard button opens the Run workflow page.
+- **Scan now:** starts a scan (or opens the Run workflow page if the browser isn't connected).
+- **Done:** mark a setup **✓ Done** once you've charted it and it leaves the queue. With a
+  connected browser this syncs to `docs/data/reviewed.json`, so it's hidden on every device.
+  The **Done** filter shows them again; **Undo done** puts one back.
 - **Change settings:** on the dashboard's settings page. The first time, connect the browser
   with a GitHub fine-grained token (the page shows the steps): *Only select repositories* →
   this repository, with **Contents: Read and write** and **Actions: Read and write**. The token
