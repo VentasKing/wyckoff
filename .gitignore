@@ -1,0 +1,5 @@
+.bar_cache/
+__pycache__/
+.pytest_cache/
+.seen_alerts.json
+.pushed_alerts.json

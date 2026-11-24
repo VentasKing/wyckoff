@@ -1,0 +1,410 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tap Scanner</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 30 30'%3E%3Crect x='1' y='1' width='28' height='28' rx='7' fill='%230D1117' stroke='%234C9EFF' stroke-width='2'/%3E%3Cpath d='M6 10 L10 20 L14 12 L18 21 L23 9' stroke='%234C9EFF' stroke-width='2' fill='none'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/lightweight-charts@4.2.0/dist/lightweight-charts.standalone.production.js"></script>
+<style>
+:root{--bg:#0D1117;--panel:#11171F;--panel2:#131A22;--line:#222B36;--line2:#1C242E;--text:#E6EBF2;--muted:#9AA6B5;--soft:#C9D2DD;
+  --accent:#4C9EFF;--acc:#5AA9FF;--dist:#FF9F43;--amber:#F5A524;--mono:'JetBrains Mono',ui-monospace,monospace}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:14px/1.45 Inter,system-ui,sans-serif}
+a{color:#7DB8FF}a:hover{color:#A9D0FF}
+button{font:inherit;color:inherit}
+.mono{font-family:var(--mono)}
+.muted{color:var(--muted)}
+header{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:14px;padding:14px 24px;border-bottom:1px solid var(--line);background:#10161D}
+.brand{display:flex;align-items:center;gap:12px}
+.brand b{font-size:17px;letter-spacing:-.01em}
+.brand small{display:block;font-size:12px;color:var(--muted)}
+.hright{display:flex;flex-wrap:wrap;align-items:center;gap:10px}
+.scaninfo{font-size:12px;color:var(--muted);text-align:right;line-height:1.4}
+.pill-ok{display:flex;align-items:center;gap:6px;font-size:12px;color:#BFE3C9;background:#13261B;border:1px solid #24503A;padding:7px 10px;border-radius:8px;text-decoration:none}
+.pill-off{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--soft);background:#1A212B;border:1px solid #323D4B;padding:7px 10px;border-radius:8px;text-decoration:none}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;height:36px;padding:0 14px;border-radius:8px;border:1px solid #2B3542;background:#1E2733;color:var(--text);font-weight:600;font-size:13px;text-decoration:none;cursor:pointer}
+.btn:hover{border-color:#5A6778;color:var(--text)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#071220}
+.btn.primary:hover{background:#6AAFFF;color:#071220}
+.btn.ghost{background:transparent;color:var(--soft);font-weight:500}
+.iconbtn{width:36px;padding:0}
+.stats{padding:14px 24px 0;display:flex;flex-wrap:wrap;gap:12px}
+.stat{flex:1 1 150px;background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:11px 14px}
+.stat .v{font-size:24px;font-weight:700;font-family:var(--mono);display:flex;align-items:center;gap:8px}
+.dot{width:8px;height:8px;border-radius:50%}
+.filters{padding:12px 24px;display:flex;flex-wrap:wrap;align-items:center;gap:16px}
+.fgroup{display:flex;flex-wrap:wrap;align-items:center;gap:6px}
+.fgroup>span{font-size:12px;color:var(--muted);margin-right:4px}
+.chip{height:30px;padding:0 11px;border-radius:999px;font-size:12px;font-weight:600;cursor:pointer;border:1px solid #2B3542;background:transparent;color:var(--muted)}
+.chip:hover{border-color:#5A6778}
+.chip[aria-pressed=true]{border-color:var(--accent);background:rgba(76,158,255,.14);color:var(--text)}
+main{padding:0 24px 28px;display:flex;flex-wrap:wrap;gap:18px;align-items:flex-start}
+.list{flex:1 1 330px;max-width:430px;min-width:0;background:var(--panel);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.listhead{display:flex;justify-content:space-between;align-items:center;padding:12px 14px;border-bottom:1px solid var(--line)}
+.rows{max-height:calc(100vh - 290px);min-height:200px;overflow-y:auto}
+.sig{display:block;width:100%;text-align:left;padding:12px 14px;border:0;border-bottom:1px solid var(--line2);background:transparent;cursor:pointer}
+.sig:hover{background:#1A222D}
+.sig[aria-current=true]{background:#18212C;box-shadow:inset 0 0 0 1px var(--accent)}
+.sig .r1,.sig .r2,.sig .r3{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.sig .r2,.sig .r3{margin-top:5px;font-size:12px}
+.sig .r3{font-family:var(--mono);color:var(--muted)}
+.sym{font-weight:700;font-size:15px}
+.tf{font-size:11px;font-weight:600;color:var(--soft);background:#1E2733;padding:2px 6px;border-radius:4px;font-family:var(--mono)}
+.side-a{color:var(--acc);font-size:11px}.side-d{color:var(--dist);font-size:11px}
+.state{font-size:11px;font-weight:600;padding:2px 7px;border-radius:999px;border:1px solid;white-space:nowrap}
+.st-potential{color:#F5A524;background:#2A2111;border-color:#5C4415}
+.st-confirmed{color:#7DB8FF;background:#122236;border-color:#24466E}
+.st-forming{color:var(--soft);background:#1A212B;border-color:#323D4B}
+.st-failed{color:#8A94A3;background:#161B22;border-color:#2B3542}
+.detail{flex:999 1 560px;min-width:0;display:flex;flex-direction:column;gap:14px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px 18px}
+.dhead{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:flex-start;gap:12px}
+.dtitle{display:flex;flex-wrap:wrap;align-items:center;gap:10px}
+.dtitle h1{margin:0;font-size:22px;letter-spacing:-.01em}
+.sidepill{font-size:12px;font-weight:600;padding:3px 8px;border-radius:999px;border:1px solid}
+.sp-a{color:var(--acc);border-color:#24466E}.sp-d{color:var(--dist);border-color:#5C3A15}
+#chart{height:430px;margin-top:14px;border-radius:8px;border:1px solid var(--line2);overflow:hidden}
+.legend{display:flex;flex-wrap:wrap;gap:14px;margin-top:10px;font-size:12px;color:var(--muted)}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.facts{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px}
+.fact{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:11px 14px}
+.fact .v{margin-top:3px;font-size:15px;font-weight:600;font-family:var(--mono);word-break:break-word}
+.fact .s{margin-top:2px;font-size:12px;color:var(--muted)}
+.two{display:flex;flex-wrap:wrap;gap:14px}.two>*{flex:1 1 300px}
+h2{margin:0 0 10px;font-size:14px}
+.tl{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:10px}
+.tl li{display:flex;gap:10px;align-items:flex-start}
+.tl .d{flex:none;width:10px;height:10px;margin-top:5px;border-radius:50%;background:#3A4757}
+.tl li:last-child .d{background:var(--amber);box-shadow:0 0 0 3px rgba(245,165,36,.2)}
+.tl .t{font-size:13px;font-weight:600}.tl .x{font-size:12px;color:var(--muted)}
+.src{padding:8px 0;border-top:1px solid var(--line2)}.src:first-of-type{border-top:0}
+.src b{font-size:13px}.src div{font-size:12px;color:var(--muted);margin-top:2px}
+.empty{padding:28px 16px;color:var(--muted);font-size:13px;text-align:center}
+.banner{margin:12px 24px 0;padding:10px 14px;border-radius:10px;font-size:13px;border:1px solid #5C4415;background:#2A2111;color:#F3D59B}
+.back{display:none}
+#settings{display:none;max-width:1100px;margin:0 auto;padding:22px 24px 40px}
+#settings .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(380px,1fr));gap:18px}
+.kv{display:flex;justify-content:space-between;gap:16px;padding:9px 0;border-top:1px solid var(--line2);font-size:13px}
+.kv:first-of-type{border-top:0}.kv span:last-child{text-align:right;color:var(--soft)}
+.tags{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.tag{font-size:12px;font-family:var(--mono);background:#1A222D;border:1px solid #2B3542;padding:3px 7px;border-radius:6px}
+body.show-settings #dash{display:none}body.show-settings #settings{display:block}
+@media (max-width:820px){
+  header,.stats,.filters,main{padding-left:14px;padding-right:14px}
+  .scaninfo{text-align:left}
+  .list{max-width:none}
+  .rows{max-height:none}
+  body.has-sel .list,body.has-sel .stats,body.has-sel .filters{display:none}
+  body:not(.has-sel) .detail{display:none}
+  .back{display:inline-flex;align-items:center;gap:4px;min-height:44px;font-weight:600;text-decoration:none;color:#7DB8FF;background:none;border:0;cursor:pointer;padding:0}
+  #chart{height:300px}
+  .dhead .btns{width:100%}.dhead .btns .btn{flex:1;height:44px}
+}
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">
+    <svg width="30" height="30" viewBox="0 0 30 30" fill="none" aria-hidden="true"><rect x="1" y="1" width="28" height="28" rx="7" stroke="#4C9EFF" stroke-width="2"/><path d="M6 10 L10 20 L14 12 L18 21 L23 9" stroke="#4C9EFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="18" cy="21" r="2.4" fill="#F5A524"/></svg>
+    <div><b>Tap Scanner</b><small>Wyckoff 2nd &amp; 3rd taps · stocks &amp; Coinbase crypto</small></div>
+  </div>
+  <div class="hright">
+    <div class="scaninfo" id="scaninfo">Loading…</div>
+    <a id="alertpill" class="pill-off" href="#settings">Phone alerts</a>
+    <a id="scannow" class="btn primary" target="_blank" rel="noopener">Scan now ↗</a>
+    <a class="btn iconbtn" href="#settings" aria-label="Settings" title="Settings">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
+    </a>
+  </div>
+</header>
+
+<div id="dash">
+  <div id="banners"></div>
+  <section class="stats" id="stats"></section>
+  <section class="filters" aria-label="Filters">
+    <div class="fgroup" id="f-market"><span>Market</span></div>
+    <div class="fgroup" id="f-tf"><span>Timeframe</span></div>
+    <div class="fgroup" id="f-state"><span>Tap 3</span></div>
+    <div class="fgroup"><button type="button" class="chip" id="f-live" aria-pressed="true">Live only</button></div>
+  </section>
+  <main>
+    <section class="list" aria-label="Signals">
+      <div class="listhead"><div><b id="listtitle">Live setups</b> <span class="muted" id="listcount"></span></div><span class="muted" style="font-size:12px">Newest first</span></div>
+      <div class="rows" id="rows"></div>
+      <div id="dismissedNote" class="muted" style="font-size:12px;padding:10px 14px;display:none"></div>
+    </section>
+    <section class="detail" id="detail" aria-label="Selected setup"></section>
+  </main>
+</div>
+
+<section id="settings" aria-label="Settings">
+  <div style="display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px;margin-bottom:16px">
+    <div style="display:flex;align-items:center;gap:14px">
+      <a href="#" class="btn ghost">‹ Dashboard</a>
+      <h1 style="margin:0;font-size:20px">Settings</h1>
+    </div>
+    <a id="editcfg" class="btn primary" target="_blank" rel="noopener">Edit settings on GitHub ↗</a>
+  </div>
+  <p class="muted" style="margin:0 0 16px;font-size:13px">Settings live in <span class="mono">config.json</span> in your GitHub repository. Edit it there and commit; the next scan uses the new settings.</p>
+  <div class="grid" id="cfggrid"></div>
+</section>
+
+<script>
+(function () {
+  const $ = (s, el = document) => el.querySelector(s);
+  const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const store = { get(k, d) { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch (e) { return d; } },
+                  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} } };
+  const TF_ORDER = ['5m', '15m', '30m', '1h', '4h', '1D', '1W'];
+  const STATES = ['potential', 'confirmed', 'forming', 'failed'];
+  const NICE = { potential: 'Potential', confirmed: 'Confirmed', forming: 'Forming', failed: 'Failed' };
+
+  // repo links (owner.github.io/repo/)
+  const owner = location.hostname.endsWith('github.io') ? location.hostname.split('.')[0] : null;
+  const repo = owner ? location.pathname.split('/').filter(Boolean)[0] : null;
+  const gh = owner && repo ? `https://github.com/${owner}/${repo}` : null;
+  $('#scannow').href = gh ? `${gh}/actions/workflows/scan.yml` : 'https://github.com';
+  $('#editcfg').href = gh ? `${gh}/edit/main/config.json` : 'https://github.com';
+
+  let DATA = null, sel = null, chart = null;
+  const F = { market: 'All', tfs: null, states: { potential: true, confirmed: true, forming: true, failed: false }, live: true };
+  let dismissed = new Set(store.get('dismissed', []));
+
+  const tz = () => (DATA && DATA.config && DATA.config.display && DATA.config.display.timezone) || Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const fmt = (iso, opts) => iso ? new Intl.DateTimeFormat('en-US', Object.assign({ timeZone: tz() }, opts)).format(new Date(iso)) : '';
+  const when = (iso) => fmt(iso, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZoneName: 'short' });
+  const ago = (iso) => { const m = Math.round((Date.now() - new Date(iso)) / 60000); return m < 60 ? `${m} min ago` : m < 1440 ? `${Math.round(m / 60)} h ago` : `${Math.round(m / 1440)} d ago`; };
+  const num = (x) => x == null ? '—' : (Math.abs(x) >= 1000 ? x.toLocaleString('en-US', { maximumFractionDigits: 2 }) : String(+(+x).toPrecision(6)));
+
+  async function load() {
+    try {
+      const r = await fetch('data/signals.json?t=' + Date.now(), { cache: 'no-store' });
+      if (!r.ok) throw new Error(r.status);
+      DATA = await r.json();
+    } catch (e) {
+      DATA = { signals: [], markets: {}, config: null, generated_at: null };
+    }
+    if (!F.tfs) { F.tfs = {}; TF_ORDER.forEach((t) => (F.tfs[t] = true)); }
+    render();
+  }
+
+  function visible() {
+    return DATA.signals.filter((s) => (F.market === 'All' || s.market === F.market.toLowerCase()) &&
+      F.tfs[s.tf] !== false && F.states[s.state] && (!F.live || s.live) && !dismissed.has(s.id));
+  }
+
+  function chips(el, items) {
+    el.querySelectorAll('button').forEach((b) => b.remove());
+    items.forEach(([label, on, fn]) => {
+      const b = document.createElement('button');
+      b.type = 'button'; b.className = 'chip'; b.textContent = label; b.setAttribute('aria-pressed', on);
+      b.onclick = fn; el.appendChild(b);
+    });
+  }
+
+  function render() {
+    // header
+    const m = DATA.markets || {};
+    const line = (k, n) => m[k] && m[k].scanned_at ? `${n} ${ago(m[k].scanned_at)}` : `${n} not scanned yet`;
+    $('#scaninfo').innerHTML = DATA.generated_at
+      ? `Last scan ${esc(when(DATA.generated_at))}<br>${esc(line('stocks', 'Stocks'))} · ${esc(line('crypto', 'Crypto'))}`
+      : 'Waiting for the first scan';
+    const al = DATA.config && DATA.config.alerts;
+    const on = al && (al.tap3_potential || al.tap3_confirmed || al.model1_forming);
+    $('#alertpill').className = on ? 'pill-ok' : 'pill-off';
+    $('#alertpill').textContent = on ? 'Phone alerts on' : 'Phone alerts off';
+
+    // banners: scan errors, closed market
+    const b = [];
+    for (const k of ['stocks', 'crypto']) {
+      if (m[k] && m[k].error) b.push(`${k === 'stocks' ? 'Stock' : 'Crypto'} scan failed at ${esc(when(m[k].error_at))}: ${esc(m[k].error)}`);
+    }
+    if (m.stocks && m.stocks.skipped_at && m.stocks.scanned_at && new Date(m.stocks.skipped_at) > new Date(m.stocks.scanned_at))
+      b.push(`US market is closed, so stocks show the results from ${esc(when(m.stocks.scanned_at))}.`);
+    $('#banners').innerHTML = b.map((x) => `<div class="banner">${x}</div>`).join('');
+
+    // filters
+    const presentTfs = TF_ORDER.filter((t) => DATA.signals.some((s) => s.tf === t));
+    chips($('#f-market'), ['All', 'Stocks', 'Crypto'].map((x) => [x, F.market === x, () => { F.market = x; render(); }]));
+    chips($('#f-tf'), presentTfs.map((t) => [t, F.tfs[t] !== false, () => { F.tfs[t] = F.tfs[t] === false; render(); }]));
+    chips($('#f-state'), STATES.filter((s) => s !== 'failed' || !F.live).map((s) => [NICE[s], !!F.states[s], () => { F.states[s] = !F.states[s]; render(); }]));
+    $('#f-live').setAttribute('aria-pressed', F.live);
+    $('#f-live').onclick = () => { F.live = !F.live; if (F.live) F.states.failed = false; render(); };
+
+    const vis = visible();
+    // stats
+    const n = (st) => vis.filter((s) => s.state === st).length;
+    $('#stats').innerHTML = [
+      [F.live ? 'Live setups' : 'Setups', vis.length, '#4C9EFF'],
+      ['Tap 3 confirmed', n('confirmed'), '#7DB8FF'],
+      ['Tap 3 potential', n('potential'), '#F5A524'],
+      ['Model 1 forming', n('forming'), '#C9D2DD'],
+    ].map(([l, v, c]) => `<div class="stat"><div class="muted" style="font-size:12px">${l}</div><div class="v">${v}<span class="dot" style="background:${c}"></span></div></div>`).join('');
+
+    // list
+    $('#listtitle').textContent = F.live ? 'Live setups' : 'All setups (last 14 days)';
+    $('#listcount').textContent = '· ' + vis.length;
+    const rows = $('#rows');
+    if (!DATA.generated_at) rows.innerHTML = '<div class="empty">No scan results yet. The first scan runs within 30 minutes of setup, or press “Scan now”.</div>';
+    else if (!vis.length) rows.innerHTML = '<div class="empty">No setups match these filters.</div>';
+    else rows.innerHTML = vis.map((s) => `
+      <button type="button" class="sig" data-id="${esc(s.id)}" aria-current="${sel && sel.id === s.id}">
+        <div class="r1"><span style="display:flex;align-items:center;gap:8px;min-width:0">
+          <span class="${s.side === 'accumulation' ? 'side-a' : 'side-d'}">${s.side === 'accumulation' ? '▲' : '▼'}</span>
+          <span class="sym">${esc(s.symbol)}</span><span class="tf">${esc(s.tf)}</span>
+          <span class="muted" style="font-size:11px">${s.market === 'stocks' ? 'Stock' : 'Crypto'}</span></span>
+          <span class="state st-${s.state}">${NICE[s.state]}</span></div>
+        <div class="r2"><span style="color:var(--soft)">${esc(s.model_name)}${s.level_tf ? ' (' + esc(s.level_tf) + ')' : ''}</span><span class="muted">${s.bars_ago === 0 ? 'this bar' : s.bars_ago + ' bar' + (s.bars_ago === 1 ? '' : 's') + ' ago'}</span></div>
+        <div class="r3"><span>${s.level != null ? 'level ' + num(s.level) : s.stop != null ? 'stop ' + num(s.stop) : ''}</span>${s.flags.length ? `<span style="color:var(--amber)">⚑ ${s.flags.length}</span>` : ''}</div>
+      </button>`).join('');
+    rows.querySelectorAll('.sig').forEach((el) => el.onclick = () => { location.hash = el.dataset.id; });
+    const nd = DATA.signals.filter((s) => dismissed.has(s.id)).length;
+    const dn = $('#dismissedNote');
+    dn.style.display = nd ? 'block' : 'none';
+    dn.innerHTML = nd ? `${nd} dismissed · <a href="#" id="undismiss">show again</a>` : '';
+    if (nd) $('#undismiss').onclick = (e) => { e.preventDefault(); dismissed = new Set(); store.set('dismissed', []); render(); };
+
+    // selection from hash
+    const id = decodeURIComponent(location.hash.slice(1));
+    document.body.classList.toggle('show-settings', id === 'settings');
+    if (id === 'settings') { renderSettings(); return; }
+    const found = DATA.signals.find((s) => s.id === id);
+    sel = found || (window.innerWidth > 820 ? vis[0] : null) || null;
+    document.body.classList.toggle('has-sel', !!found);
+    rows.querySelectorAll('.sig').forEach((el) => el.setAttribute('aria-current', !!sel && el.dataset.id === sel.id));
+    renderDetail();
+  }
+
+  function renderDetail() {
+    const d = $('#detail');
+    if (!sel) { d.innerHTML = DATA.generated_at ? '<div class="card empty">Pick a setup to see its chart.</div>' : ''; return; }
+    const s = sel, acc = s.side === 'accumulation', r = s.range;
+    const flagText = { range_high_not_fresh: 'Range high already taken before tap 3', range_low_not_fresh: 'Range low already taken before tap 3',
+      ar_no_break_of_structure: 'AR did not break structure', inside_larger_range: 'Inside a larger range' };
+    const statusNote = s.status === 'invalidated' ? `Invalidated: ${s.invalid_reason || ''}` : s.status === 'completed' ? 'Played out: broke the opposite end' :
+      s.status === 'superseded' ? 'Replaced by a newer range' : '';
+    const next = s.state === 'potential' ? `Wait for a break of structure${s.level_tf ? ' on the ' + s.level_tf : ''}` :
+      s.state === 'forming' ? `Watch for a close back inside the range (M1 limit ${num(r.model1_limit)})` :
+      s.state === 'confirmed' ? (s.stop != null ? `Stop beyond ${num(s.stop)}` : `Invalid if price goes past tap 2 (${num(r.tap2)})`) : statusNote;
+    d.innerHTML = `
+      <div class="card">
+        <button type="button" class="back" id="backbtn">‹ Signals</button>
+        <div class="dhead">
+          <div>
+            <div class="dtitle"><h1>${esc(s.symbol)}</h1><span class="tf" style="font-size:12px;padding:3px 7px">${esc(s.tf)}</span>
+              <span class="sidepill ${acc ? 'sp-a' : 'sp-d'}">${acc ? '▲ Accumulation' : '▼ Distribution'}</span>
+              <span class="state st-${s.state}" style="font-size:12px;padding:3px 8px">Tap 3 · ${NICE[s.state]}</span></div>
+            <div class="muted" style="margin-top:6px;font-size:13px">${esc(s.model_name)}${s.level_tf ? ' (' + esc(s.level_tf) + ')' : ''} · tap 3 ${esc(when(s.time))}${statusNote ? ' · <span style="color:#F08C8C">' + esc(statusNote) + '</span>' : ''}</div>
+          </div>
+          <div class="btns" style="display:flex;gap:8px;flex-wrap:wrap">
+            <a class="btn" href="${esc(s.tv)}" target="_blank" rel="noopener">Open in TradingView ↗</a>
+            <button type="button" class="btn ghost" id="dismissbtn">Dismiss</button>
+          </div>
+        </div>
+        <div id="chart" role="img" aria-label="${esc(s.tf)} chart of ${esc(s.symbol)} with the range and taps marked"></div>
+        <div class="legend">
+          <span><span style="width:16px;height:2px;background:#8FB4E0"></span>Range high / low</span>
+          <span><span style="width:16px;border-top:2px dotted #8A94A3"></span>EQ</span>
+          <span><span style="width:16px;border-top:2px dashed #E06C6C"></span>Deviation limit</span>
+          ${s.zone ? '<span><span style="width:16px;border-top:2px solid #F5A524"></span>Extreme ' + (acc ? 'demand' : 'supply') + ' zone</span>' : ''}
+          ${s.liquidity ? '<span><span style="width:16px;border-top:2px dashed #B48CF2"></span>Extreme liquidity</span>' : ''}
+          <span class="muted">Times in ${esc(tz())}</span>
+        </div>
+      </div>
+      <div class="facts">
+        <div class="fact"><div class="muted" style="font-size:12px">Range</div><div class="v">${num(Math.min(r.climax, r.reaction))} – ${num(Math.max(r.climax, r.reaction))}</div><div class="s">EQ ${num(r.eq)}</div></div>
+        <div class="fact"><div class="muted" style="font-size:12px">Tap 2 ${acc ? 'low' : 'high'}</div><div class="v">${num(r.tap2)}</div><div class="s">${r.tap2_closed_outside ? 'Closed outside, within limit' : 'Wick only'}</div></div>
+        <div class="fact"><div class="muted" style="font-size:12px">${s.level != null ? 'Level hit' : 'Tap 3 extreme / stop'}</div><div class="v">${num(s.level != null ? s.level : s.stop)}</div><div class="s">${esc(s.model_name)}</div></div>
+        <div class="fact"><div class="muted" style="font-size:12px">Next</div><div class="v" style="font-family:Inter,system-ui,sans-serif;font-size:14px">${esc(next)}</div><div class="s">${s.bars_ago === 0 ? 'Tap 3 on this bar' : s.bars_ago + ' bars since tap 3'}</div></div>
+      </div>
+      <div class="two">
+        <div class="card"><h2>How this setup formed</h2><ol class="tl">${s.timeline.map((e) =>
+          `<li><span class="d"></span><div><div class="t">${esc(e.title)}</div><div class="x">${esc(e.detail)} · ${esc(when(e.time))}</div></div></li>`).join('')}</ol></div>
+        <div style="display:flex;flex-direction:column;gap:14px">
+          <div class="card"><h2>Where the levels came from</h2>${sources(s)}</div>
+          <div class="card"><h2>Red flags</h2>${s.flags.length ? s.flags.map((f) => `<div style="display:flex;gap:8px;font-size:13px;padding:3px 0"><span style="color:var(--amber)">⚑</span>${esc(flagText[f] || f)}</div>`).join('') : '<div class="muted" style="font-size:13px">None</div>'}</div>
+        </div>
+      </div>`;
+    $('#backbtn').onclick = () => { history.pushState('', document.title, location.pathname + location.search); render(); window.scrollTo(0, 0); };
+    $('#dismissbtn').onclick = () => { dismissed.add(s.id); store.set('dismissed', [...dismissed]); history.replaceState('', document.title, location.pathname + location.search); render(); };
+    drawChart(s);
+  }
+
+  function sources(s) {
+    const acc = s.side === 'accumulation', out = [];
+    if (s.liquidity) out.push(`<div class="src"><b>Extreme liquidity · ${esc(s.liquidity.tf)}</b><div>${num(s.liquidity.level)} — the first two-candle structure ${acc ? 'low' : 'high'} after tap 2${s.liquidity.low ? ', candle at ' + esc(when(s.liquidity.low)) : ''}</div></div>`);
+    if (s.zone) out.push(`<div class="src"><b>Extreme ${acc ? 'demand' : 'supply'} · ${esc(s.zone.tf)}</b><div>${num(s.zone.lo)} – ${num(s.zone.hi)} — order block at ${esc(when(s.zone.ob))}, fair value gap completed ${esc(when(s.zone.fvg))}</div></div>`);
+    if (s.model === 'model1') out.push(`<div class="src"><b>Model 1</b><div>Tap 3 deviated the tap 2 extreme (${num(s.range.tap2)}). Once confirmed, its extreme is the stop.</div></div>`);
+    return out.join('') || '<div class="muted" style="font-size:13px">No Model 2 levels found for this range.</div>';
+  }
+
+  function drawChart(s) {
+    const el = $('#chart');
+    if (chart) { chart.remove(); chart = null; }
+    if (!window.LightweightCharts) { el.innerHTML = '<div class="empty">The chart library didn’t load. Check your connection and refresh.</div>'; return; }
+    const LC = window.LightweightCharts;
+    const intraday = !['1D', '1W'].includes(s.tf);
+    const tfmt = (t, o) => new Intl.DateTimeFormat('en-US', Object.assign({ timeZone: tz() }, o)).format(new Date(t * 1000));
+    chart = LC.createChart(el, {
+      autoSize: true,
+      layout: { background: { color: '#0D1218' }, textColor: '#9AA6B5', fontFamily: 'Inter, system-ui, sans-serif' },
+      grid: { vertLines: { color: '#151C24' }, horzLines: { color: '#151C24' } },
+      rightPriceScale: { borderColor: '#222B36' },
+      timeScale: { borderColor: '#222B36', timeVisible: intraday, rightOffset: 6,
+        tickMarkFormatter: (t, type) => tfmt(t, type === 0 ? { year: 'numeric' } : type === 1 ? { month: 'short' } : type === 2 ? { month: 'short', day: 'numeric' } : { hour: 'numeric', minute: '2-digit' }) },
+      localization: { timeFormatter: (t) => tfmt(t, intraday ? { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' } : { month: 'short', day: 'numeric', year: 'numeric' }) },
+      crosshair: { mode: LC.CrosshairMode.Normal },
+    });
+    const ser = chart.addCandlestickSeries({ upColor: '#26A69A', downColor: '#EF5350', borderVisible: false, wickUpColor: '#26A69A', wickDownColor: '#EF5350' });
+    ser.setData(s.candles.map(([t, o, h, l, c]) => ({ time: t, open: o, high: h, low: l, close: c })));
+    const acc = s.side === 'accumulation', r = s.range, L = LC.LineStyle;
+    const pl = (price, color, style, title, width) => price != null && ser.createPriceLine({ price, color, lineWidth: width || 1, lineStyle: style, axisLabelVisible: true, title });
+    pl(r.reaction, '#8FB4E0', L.Solid, acc ? 'range high' : 'range low', 2);
+    pl(r.climax, '#8FB4E0', L.Solid, acc ? 'range low' : 'range high', 2);
+    pl(r.eq, '#8A94A3', L.Dotted, 'EQ');
+    pl(r.dev_limit, '#E06C6C', L.Dashed, 'dev limit');
+    if (s.model === 'model1') pl(r.model1_limit, '#E06C6C', L.SparseDotted, 'M1 limit');
+    if (s.zone) { pl(s.zone.hi, '#F5A524', L.Solid, `ext. ${acc ? 'demand' : 'supply'} (${s.zone.tf})`); pl(s.zone.lo, '#F5A524', L.Solid, ''); }
+    if (s.liquidity) pl(s.liquidity.level, '#B48CF2', L.Dashed, `ext. liquidity (${s.liquidity.tf})`);
+    if (s.stop != null && s.state === 'confirmed') pl(s.stop, '#E06C6C', L.Dotted, 'stop');
+    const times = new Set(s.candles.map((c) => c[0]));
+    const marks = s.markers.map((m) => ({ ...m, t: Math.floor(new Date(m.time) / 1000) })).filter((m) => times.has(m.t))
+      .sort((a, b) => a.t - b.t).map((m) => {
+        const below = m.kind === 'ar' ? !acc : acc;
+        const col = m.kind === 'ar' ? '#8FB4E0' : m.kind === 'tap3' ? (s.state === 'failed' ? '#8A94A3' : '#F5A524') : '#F5A524';
+        return { time: m.t, position: below ? 'belowBar' : 'aboveBar', color: col, shape: below ? 'arrowUp' : 'arrowDown', text: m.label };
+      });
+    ser.setMarkers(marks);
+    chart.timeScale().fitContent();
+  }
+
+  function renderSettings() {
+    const c = DATA.config;
+    const g = $('#cfggrid');
+    if (!c) { g.innerHTML = '<div class="card empty">Settings appear after the first scan.</div>'; return; }
+    const kv = (k, v) => `<div class="kv"><span>${k}</span><span>${v}</span></div>`;
+    const tags = (xs) => `<div class="tags">${xs.map((x) => `<span class="tag">${esc(x)}</span>`).join('')}</div>`;
+    const yes = (b) => (b ? 'On' : 'Off');
+    const t2 = { either: 'Closes 25% back in, or closes inside twice', quarter: 'Closes 25% back into the range', two_closes: 'Closes inside twice in a row', close: 'Closes inside once' }[c.rules.tap2_return] || c.rules.tap2_return;
+    g.innerHTML = `
+      <div class="card"><h2>Stocks</h2>${kv('Scanning', c.stocks.enabled ? esc(c.stocks.universe) : 'Off')}${kv('Timeframes', esc(c.stocks.timeframes.join(' · ')))}${kv('Data', 'Alpaca free tier, ~15 min delayed')}
+        <div class="muted" style="font-size:12px;margin-top:8px">My list · ${c.stocks.tickers.length} tickers</div>${tags(c.stocks.tickers)}</div>
+      <div class="card"><h2>Crypto</h2>${kv('Scanning', c.crypto.enabled ? esc(c.crypto.universe) : 'Off')}${kv('Timeframes', esc(c.crypto.timeframes.join(' · ')))}${kv('Data', 'Coinbase spot, free')}
+        <div class="muted" style="font-size:12px;margin-top:8px">My list · ${c.crypto.products.length} coins</div>${tags(c.crypto.products)}</div>
+      <div class="card"><h2>Model rules</h2>${kv('Tap 2 is complete when price…', esc(t2))}${kv('Require the AR to break structure', yes(c.rules.require_ar_break_of_structure))}${kv('Allow ranges inside larger ranges', yes(c.rules.allow_nested_ranges))}</div>
+      <div class="card"><h2>Phone alerts</h2>${kv('Tap 3 potential', yes(c.alerts.tap3_potential))}${kv('Tap 3 confirmed', yes(c.alerts.tap3_confirmed))}${kv('Model 1 forming', yes(c.alerts.model1_forming))}${kv('Only taps from the last', c.alerts.max_bars_ago + ' bars')}${kv('Time zone', esc(c.display.timezone))}
+        <div class="muted" style="font-size:12px;margin-top:8px">Alerts go to your ntfy topic, kept in the repository's secrets (NTFY_TOPIC).</div></div>`;
+  }
+
+  window.addEventListener('hashchange', () => { render(); window.scrollTo(0, 0); });
+  let wide = window.innerWidth > 820;
+  window.addEventListener('resize', () => { const w = window.innerWidth > 820; if (w !== wide && DATA) { wide = w; render(); } });
+  load();
+  setInterval(load, 5 * 60 * 1000);
+})();
+</script>
+</body>
+</html>
