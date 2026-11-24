@@ -109,6 +109,14 @@ body.show-settings #dash{display:none}body.show-settings #settings{display:block
 .addrow{display:flex;gap:8px;margin-top:8px}
 .status{font-size:13px;color:var(--muted)}.status.ok{color:#8BD5A6}.status.err{color:#F08C8C}.status.warn{color:#F3D59B}
 .steps{margin:8px 0 12px;padding-left:20px;font-size:13px;line-height:1.7}
+.topnote{position:fixed;left:50%;top:14px;transform:translate(-50%,-150%);opacity:0;transition:transform .35s ease,opacity .35s ease;z-index:20;display:flex;align-items:center;gap:8px;
+  background:#13261B;border:1px solid #24503A;color:#CFF0DA;padding:10px 16px;border-radius:999px;font-size:13px;font-weight:600;box-shadow:0 8px 28px rgba(0,0,0,.45)}
+.topnote.show{transform:translate(-50%,0);opacity:1}
+.scanning{display:none;align-items:center;gap:8px;font-size:12px;color:#CFE3FF;background:#122236;border:1px solid #24466E;padding:7px 10px;border-radius:8px}
+.scanning.on{display:flex}
+.spin{width:12px;height:12px;border-radius:50%;border:2px solid #4C9EFF;border-right-color:transparent;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){.topnote{transition:none}.spin{animation:none}}
 .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#1E2733;border:1px solid #2B3542;color:var(--text);padding:10px 16px;border-radius:10px;font-size:13px;z-index:10;box-shadow:0 6px 24px rgba(0,0,0,.4)}
 @media (max-width:820px){
   header,.stats,.filters,main{padding-left:14px;padding-right:14px}
@@ -131,6 +139,7 @@ body.show-settings #dash{display:none}body.show-settings #settings{display:block
   </div>
   <div class="hright">
     <div class="scaninfo" id="scaninfo">Loading…</div>
+    <div class="scanning" id="scanning" role="status"><span class="spin" aria-hidden="true"></span>Scanning…</div>
     <a id="alertpill" class="pill-off" href="#settings">Phone alerts</a>
     <a id="scannow" class="btn primary" target="_blank" rel="noopener">Scan now ↗</a>
     <a class="btn iconbtn" href="#settings" aria-label="Settings" title="Settings">
@@ -139,6 +148,7 @@ body.show-settings #dash{display:none}body.show-settings #settings{display:block
   </div>
 </header>
 
+<div class="topnote" id="topnote" role="status" aria-live="polite"></div>
 <div id="dash">
   <div id="banners"></div>
   <section class="stats" id="stats"></section>
@@ -202,18 +212,62 @@ body.show-settings #dash{display:none}body.show-settings #settings{display:block
   const ago = (iso) => { const m = Math.round((Date.now() - new Date(iso)) / 60000); return m < 60 ? `${m} min ago` : m < 1440 ? `${Math.round(m / 60)} h ago` : `${Math.round(m / 1440)} d ago`; };
   const num = (x) => x == null ? '—' : (Math.abs(x) >= 1000 ? x.toLocaleString('en-US', { maximumFractionDigits: 2 }) : String(+(+x).toPrecision(6)));
 
+  let lastGen = null, scanningSince = null, pollTimer = null, noteTimer = null;
+
+  function topnote(msg) {
+    const el = $('#topnote');
+    el.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>' + esc(msg);
+    el.classList.add('show');
+    clearTimeout(noteTimer);
+    noteTimer = setTimeout(() => el.classList.remove('show'), 6000);
+  }
+
+  function setScanning(on) {
+    scanningSince = on ? Date.now() : null;
+    $('#scanning').classList.toggle('on', !!on);
+    schedule();
+  }
+
+  // check for new results: every minute, or every 20 s while a scan we started is running
+  function schedule() {
+    clearTimeout(pollTimer);
+    if (scanningSince && Date.now() - scanningSince > 15 * 60 * 1000) { scanningSince = null; $('#scanning').classList.remove('on'); }
+    pollTimer = setTimeout(async () => { await load(); schedule(); }, scanningSince ? 20000 : 60000);
+  }
+
   async function load() {
+    let fresh = null;
     try {
       const r = await fetch('data/signals.json?t=' + Date.now(), { cache: 'no-store' });
       if (!r.ok) throw new Error(r.status);
-      DATA = await r.json();
+      fresh = await r.json();
     } catch (e) {
-      DATA = { signals: [], markets: {}, config: null, generated_at: null };
+      if (!DATA) DATA = { signals: [], markets: {}, config: null, generated_at: null };   // keep what's on screen
     }
+    if (fresh) {
+      const isNew = lastGen !== null && fresh.generated_at && fresh.generated_at !== lastGen;
+      DATA = fresh;
+      if (fresh.generated_at) lastGen = fresh.generated_at;
+      if (!isNew && DATA_LOADED_ONCE) { refreshScanInfo(); return; }      // nothing new: don't redraw
+      if (isNew) {
+        const live = fresh.signals.filter((x) => x.live).length;
+        const errs = Object.values(fresh.markets || {}).filter((m) => m.error && m.error_at === fresh.generated_at).length;
+        topnote(`Scan complete · ${live} live setup${live === 1 ? '' : 's'}${errs ? ' · ' + errs + ' market failed' : ''}`);
+        if (scanningSince) { scanningSince = null; $('#scanning').classList.remove('on'); }
+      } else if (lastGen === null && !fresh.generated_at) lastGen = '';
+    } else if (!fresh && DATA_LOADED_ONCE) return;
     if (!F.tfs) { F.tfs = {}; TF_ORDER.forEach((t) => (F.tfs[t] = true)); }
     if (document.body.classList.contains('show-settings') && DATA_LOADED_ONCE) return;
     DATA_LOADED_ONCE = true;
     render();
+  }
+
+  function refreshScanInfo() {
+    const m = DATA.markets || {};
+    const line = (k, n) => m[k] && m[k].scanned_at ? `${n} ${ago(m[k].scanned_at)}` : `${n} not scanned yet`;
+    $('#scaninfo').innerHTML = DATA.generated_at
+      ? `Last scan ${esc(when(DATA.generated_at))}<br>${esc(line('stocks', 'Stocks'))} · ${esc(line('crypto', 'Crypto'))}`
+      : 'Waiting for the first scan';
   }
 
   function visible() {
@@ -233,10 +287,7 @@ body.show-settings #dash{display:none}body.show-settings #settings{display:block
   function render() {
     // header
     const m = DATA.markets || {};
-    const line = (k, n) => m[k] && m[k].scanned_at ? `${n} ${ago(m[k].scanned_at)}` : `${n} not scanned yet`;
-    $('#scaninfo').innerHTML = DATA.generated_at
-      ? `Last scan ${esc(when(DATA.generated_at))}<br>${esc(line('stocks', 'Stocks'))} · ${esc(line('crypto', 'Crypto'))}`
-      : 'Waiting for the first scan';
+    refreshScanInfo();
     const al = DATA.config && DATA.config.alerts;
     const on = al && (al.tap3_potential || al.tap3_confirmed || al.model1_forming);
     $('#alertpill').className = on ? 'pill-ok' : 'pill-off';
@@ -486,6 +537,7 @@ body.show-settings #dash{display:none}body.show-settings #settings{display:block
       st.className = 'status ok'; st.textContent = 'Saved. The next scan uses these settings.';
       if (scan) {
         const ok = await startScan();
+        if (ok) setScanning(true);
         st.className = ok ? 'status ok' : 'status warn';
         st.textContent = ok ? 'Saved, and a scan has started. Results in a few minutes.' : 'Saved, but couldn’t start a scan: give the token Actions: Read and write.';
       }
@@ -640,15 +692,18 @@ body.show-settings #dash{display:none}body.show-settings #settings{display:block
   $('#scannow').addEventListener('click', async (e) => {
     if (!token || !API) return;               // no token: the link opens GitHub's Run workflow page
     e.preventDefault();
-    try { toast((await startScan()) ? 'Scan started. Results in a few minutes.' : 'Couldn’t start a scan: the token needs Actions: Read and write.'); }
+    try {
+      const ok = await startScan();
+      toast(ok ? 'Scan started. Results in a few minutes.' : 'Couldn’t start a scan: the token needs Actions: Read and write.');
+      if (ok) setScanning(true);
+    }
     catch (err) { toast('Couldn’t start a scan.'); }
   });
 
   window.addEventListener('hashchange', () => { render(); window.scrollTo(0, 0); });
   let wide = window.innerWidth > 820;
   window.addEventListener('resize', () => { const w = window.innerWidth > 820; if (w !== wide && DATA) { wide = w; render(); } });
-  load();
-  setInterval(load, 5 * 60 * 1000);
+  load().then(schedule);
 })();
 </script>
 </body>
