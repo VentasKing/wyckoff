@@ -65,6 +65,7 @@ def stock_market_open(now: datetime) -> bool:
 # -------------------------------------------------------------- signals ----
 def signal_records(market: str, symbol: str, tv_symbol: str, frames: dict, ranges, cfg) -> list[dict]:
     hist_cut = pd.Timestamp.now(tz="UTC") - pd.Timedelta(days=cfg["display"].get("history_days", 14))
+    max_live = cfg["display"].get("max_live_bars", 30)
     out = []
     for r in ranges:
         taps = r.tap3_events()
@@ -76,7 +77,10 @@ def signal_records(market: str, symbol: str, tv_symbol: str, frames: dict, range
             t3_time = pd.Timestamp(e.time)
             state = ("failed" if e.failed else "confirmed" if e.confirmed else
                      "forming" if e.model == "model1" else "potential")
+            bars_ago = int(r.n_bars - 1 - e.idx)
             live = r.status not in ("completed", "invalidated", "superseded") and not e.failed
+            stale = live and bars_ago > max_live        # played out long ago: treat as history
+            live = live and not stale
             if not live and t3_time < hist_cut:      # the history window applies to finished setups only
                 continue
             sid = slug(f"{symbol}-{r.tf}-{r.side}-{iso(r.times.get('climax'))}-{e.model}")
@@ -127,7 +131,7 @@ def signal_records(market: str, symbol: str, tv_symbol: str, frames: dict, range
                 "id": sid, "market": market, "symbol": symbol, "tf": r.tf, "side": r.side,
                 "model": e.model, "model_name": MODEL_NAME.get(e.model, e.model),
                 "state": state, "live": live, "status": r.status, "invalid_reason": r.invalid_reason,
-                "time": iso(e.time), "price": rnd(e.price), "bars_ago": int(r.n_bars - 1 - e.idx),
+                "time": iso(e.time), "price": rnd(e.price), "bars_ago": bars_ago, "stale": stale,
                 "level": rnd(e.level) if e.model != "model1" else None, "level_tf": e.level_tf,
                 "stop": rnd(e.extreme) if e.model == "model1" else None,
                 "extreme": rnd(e.extreme), "note": e.note,

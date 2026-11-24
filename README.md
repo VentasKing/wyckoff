@@ -71,6 +71,7 @@ flood. From then on you get alerts for new ones.
 | `schedule.automatic` | `true` = scan every 30 minutes; `false` = only when you press Scan now |
 | `display.timezone` | e.g. `"America/Los_Angeles"` |
 | `display.history_days` | how far back the dashboard's *all setups* view goes |
+| `display.max_live_bars` | a tap 3 older than this many candles on its own timeframe stops being live (30 = 30 days on the daily, 30 weeks on the weekly) and then falls under `history_days` |
 
 ## Running it yourself (optional)
 ```

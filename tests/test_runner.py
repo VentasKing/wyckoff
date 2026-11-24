@@ -107,9 +107,19 @@ def test_missing_symbols_are_reported(sandbox):
 def test_live_setups_are_never_cut_by_the_history_window(sandbox):
     cfg = json.loads((scan.ROOT / "config.json").read_text())
     cfg["display"]["history_days"] = 1                  # tiny window: synthetic taps are years old
+    cfg["display"]["max_live_bars"] = 100000
     (scan.ROOT / "config.json").write_text(json.dumps(cfg))
     out = scan.main(now=datetime(2026, 11, 23, 17, 0, tzinfo=timezone.utc))
     assert out["signals"] and all(s["live"] for s in out["signals"])
+
+
+def test_old_live_setups_go_stale(sandbox):
+    cfg = json.loads((scan.ROOT / "config.json").read_text())
+    cfg["display"]["history_days"] = 1
+    cfg["display"]["max_live_bars"] = 0                 # every tap 3 is older than 0 candles
+    (scan.ROOT / "config.json").write_text(json.dumps(cfg))
+    out = scan.main(now=datetime(2026, 11, 23, 17, 0, tzinfo=timezone.utc))
+    assert not any(s["live"] for s in out["signals"])
 
 
 def test_explain_reports_candidates_and_reasons(capsys):

@@ -27,7 +27,8 @@
   },
   "display": {
     "timezone": "America/Los_Angeles",
-    "history_days": 14
+    "history_days": 14,
+    "max_live_bars": 30
   },
   "schedule": {
     "automatic": true

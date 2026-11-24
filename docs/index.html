@@ -583,6 +583,7 @@ body.show-settings #dash{display:none}body.show-settings #settings{display:block
     n(c.rules.max_opposite_deviations ?? 1, 0, 5, 'Deviations of the other end');
     n(c.alerts.max_bars_ago, 0, 100, 'Alert window');
     n(c.display.history_days, 1, 60, 'History days');
+    n(c.display.max_live_bars ?? 30, 1, 1000, 'Live for (candles)');
     return errs;
   }
 
@@ -722,6 +723,7 @@ body.show-settings #dash{display:none}body.show-settings #settings{display:block
         ${numf('alerts.max_bars_ago', 'Only alert for taps from the last (candles)', '', 5)}
         ${selField('display.timezone', 'Time zone', TZS)}
         ${numf('display.history_days', 'Days of history in “All setups”', '', 14)}
+        ${numf('display.max_live_bars', 'A tap 3 stays live for (candles on its timeframe)', '', 30)}
         <div class="fld"><button type="button" class="btn ghost" id="disconnect">Disconnect this browser</button></div></div>`;
     bindEditing();
   }
