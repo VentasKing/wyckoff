@@ -9,7 +9,7 @@
   "crypto": {
     "enabled": true,
     "universe": "my list",
-    "products": ["BTC-USD", "ETH-USD", "SOL-USD", "XRP-USD", "DOGE-USD", "QNT-USD", "ASTER-USD", "SAND-USD", "BCH-USD", "ETC-USD", "BAT-USD", "AVAX-USD", "PEPE-USD", "PENGU-USD", "ZECUSD-USD", "NEAR-USD", "ONDO-USD", "SUI-USD", "LINK-USD", "ADA-USD", "XLM-USD", "HBAR-USD", "LTC-USD", "AAVE-USD", "DOT-USD", "ENA-USD"],
+    "products": ["BTC-USD", "ETH-USD", "SOL-USD", "XRP-USD", "DOGE-USD", "QNT-USD", "ASTER-USD", "SAND-USD", "BCH-USD", "ETC-USD", "BAT-USD", "AVAX-USD", "PEPE-USD", "PENGU-USD", "NEAR-USD", "ONDO-USD", "SUI-USD", "LINK-USD", "ADA-USD", "XLM-USD", "HBAR-USD", "LTC-USD", "AAVE-USD", "DOT-USD", "ENA-USD", "ZEC-USD"],
     "timeframes": ["15m", "30m", "1h", "4h", "1D", "1W"]
   },
   "rules": {
