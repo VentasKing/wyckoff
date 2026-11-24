@@ -24,14 +24,29 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Check the automatic-scans switch
+        id: mode
+        run: |
+          auto=$(python3 -c "import json; print(str(json.load(open('config.json')).get('schedule', {}).get('automatic', True)).lower())")
+          echo "auto=$auto" >> "$GITHUB_OUTPUT"
+          if [ "${{ github.event_name }}" = "schedule" ] && [ "$auto" != "true" ]; then
+            echo "Automatic scans are off in settings; skipping this scheduled run."
+            echo "run=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          fi
+
       - uses: actions/setup-python@v5
+        if: steps.mode.outputs.run == 'true'
         with:
           python-version: "3.12"
           cache: pip
 
       - run: pip install -r requirements.txt
+        if: steps.mode.outputs.run == 'true'
 
       - name: Restore downloaded candles
+        if: steps.mode.outputs.run == 'true'
         uses: actions/cache@v4
         with:
           path: .bar_cache
@@ -39,6 +54,7 @@ jobs:
           restore-keys: bars-
 
       - name: Scan
+        if: steps.mode.outputs.run == 'true'
         env:
           APCA_API_KEY_ID: ${{ secrets.APCA_API_KEY_ID }}
           APCA_API_SECRET_KEY: ${{ secrets.APCA_API_SECRET_KEY }}
@@ -47,6 +63,7 @@ jobs:
         run: python scan.py
 
       - name: Save results
+        if: steps.mode.outputs.run == 'true'
         run: |
           git config user.name "tap-scanner-bot"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"

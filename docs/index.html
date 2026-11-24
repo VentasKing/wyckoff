@@ -272,9 +272,11 @@ body.show-settings #dash{display:none}body.show-settings #settings{display:block
   function refreshScanInfo() {
     const m = DATA.markets || {};
     const line = (k, n) => m[k] && m[k].scanned_at ? `${n} ${ago(m[k].scanned_at)}` : `${n} not scanned yet`;
+    const manual = DATA.config && DATA.config.schedule && DATA.config.schedule.automatic === false;
     $('#scaninfo').innerHTML = DATA.generated_at
-      ? `Last scan ${esc(when(DATA.generated_at))}<br>${esc(line('stocks', 'Stocks'))} · ${esc(line('crypto', 'Crypto'))}`
-      : 'Waiting for the first scan';
+      ? `Last scan ${esc(when(DATA.generated_at))}<br>` + (manual ? 'Automatic scans off · press Scan now'
+        : `${esc(line('stocks', 'Stocks'))} · ${esc(line('crypto', 'Crypto'))}`)
+      : (manual ? 'Automatic scans off · press Scan now' : 'Waiting for the first scan');
   }
 
   function visible() {
@@ -669,6 +671,7 @@ body.show-settings #dash{display:none}body.show-settings #settings{display:block
     const tags = (xs) => `<div class="tags">${xs.map((x) => `<span class="tag">${esc(x)}</span>`).join('')}</div>`;
     const yes = (b) => (b ? 'On' : 'Off');
     return `
+      <div class="card" style="grid-column:1/-1"><h2>Scanning</h2>${kv('Automatic scans every 30 minutes', yes(!c.schedule || c.schedule.automatic !== false))}</div>
       <div class="card"><h2>Stocks</h2>${kv('Scanning', c.stocks.enabled ? esc(c.stocks.universe) : 'Off')}${kv('Timeframes', esc(c.stocks.timeframes.join(' · ')))}
         <div class="muted" style="font-size:12px;margin-top:8px">My list · ${c.stocks.tickers.length} tickers</div>${tags(c.stocks.tickers)}</div>
       <div class="card"><h2>Crypto</h2>${kv('Scanning', c.crypto.enabled ? esc(c.crypto.universe) : 'Off')}${kv('Timeframes', esc(c.crypto.timeframes.join(' · ')))}
@@ -690,9 +693,12 @@ body.show-settings #dash{display:none}body.show-settings #settings{display:block
       bindConnect(); return;
     }
     const d = draft;
+    d.schedule = d.schedule || { automatic: true };
     d.rules.trend_lookback = d.rules.trend_lookback ?? 50;
     d.rules.max_opposite_deviations = d.rules.max_opposite_deviations ?? 1;
     g.innerHTML = `
+      <div class="card" style="grid-column:1/-1"><h2>Scanning</h2>
+        ${sw('schedule.automatic', 'Automatic scans every 30 minutes', 'Off: scans only run when you press Scan now (stocks on weekdays 9:00–17:00 New York, crypto around the clock)')}</div>
       <div class="card"><h2>Stocks</h2><div class="muted" style="font-size:12px;margin-top:-6px">Alpaca free tier, ~15 min delayed · weekdays 9:00–17:00 New York</div>
         ${sw('stocks.enabled', 'Scan stocks')}
         ${selField('stocks.universe', 'What to scan', UNI.stocks)}

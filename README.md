@@ -49,7 +49,10 @@ flood. From then on you get alerts for new ones.
   rules, and press **Save** or **Save & scan now**. You can also edit `config.json` on GitHub.
 - **Stocks** are scanned on weekdays from 9:00 to 17:00 New York time. Outside those hours
   the dashboard keeps the last results. **Crypto** is scanned around the clock.
-- **Pause everything:** Actions → Scan → **⋯ → Disable workflow**.
+- **Manual scans only:** switch off *Automatic scans* in the dashboard settings (or set
+  `"schedule": {"automatic": false}` in `config.json`). The 30-minute timer then stops
+  straight away and only **Scan now** scans. *Disable workflow* in the Actions tab stops
+  everything, including Scan now.
 
 ## Settings reference (`config.json`)
 
@@ -65,6 +68,7 @@ flood. From then on you get alerts for new ones.
 | `rules.trend_lookback` | tap 1 must close below (selling climax) or above (buying climax) every close of this many previous candles, so ranges follow the trend; `0` turns it off |
 | `alerts.tap3_potential`, `alerts.tap3_confirmed`, `alerts.model1_forming` | `true` / `false` |
 | `alerts.max_bars_ago` | only alert for taps this many candles old or newer |
+| `schedule.automatic` | `true` = scan every 30 minutes; `false` = only when you press Scan now |
 | `display.timezone` | e.g. `"America/Los_Angeles"` |
 | `display.history_days` | how far back the dashboard's *all setups* view goes |
 

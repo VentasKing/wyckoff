@@ -28,5 +28,8 @@
   "display": {
     "timezone": "America/Los_Angeles",
     "history_days": 14
+  },
+  "schedule": {
+    "automatic": true
   }
 }
