@@ -68,13 +68,31 @@ def test_aggressive_move_without_prior_structure():
     assert "ar_no_break_of_structure" in r.red_flags
 
 
+def nested_path():
+    """Like model1_path, but tap 2 CLOSES below the range low (within the limit),
+    so it is a new low by closes and can start a range of its own."""
+    p = base_range()
+    p.bar(103, 103.5, 96, 97)           # tap 2 closes below 99.7 (limit 89.55)
+    p.bar(97, 101, 96.5, 100.5)
+    p.leg(115, 3).leg(109, 2).leg(127, 3)
+    p.leg(98, 5)
+    p.bar(98, 98.5, 93, 99)
+    p.leg(145, 6)
+    return p
+
+
 def test_range_within_range_is_kept_and_flagged():
-    rs = [r for r in detect_ranges(model1_path().df(), "1D") if r.side == "accumulation"]
+    rs = [r for r in detect_ranges(nested_path().df(), "1D") if r.side == "accumulation"]
     inner = [r for r in rs if "inside_larger_range" in r.red_flags]
     assert len(rs) >= 2 and inner
     assert inner[0].climax_price == pytest.approx(96)        # tap 2 low starts the inner range
-    flat = detect_ranges(model1_path().df(), "1D", allow_nested=False)
+    flat = detect_ranges(nested_path().df(), "1D", allow_nested=False)
     assert len([r for r in flat if r.side == "accumulation"]) == 1
+
+
+def test_wick_only_tap2_does_not_start_a_range_by_closes():
+    rs = [r for r in detect_ranges(model1_path().df(), "1D") if r.side == "accumulation"]
+    assert [r.climax_price for r in rs] == [pytest.approx(99.7)]
 
 
 def test_weekly_uses_030():
@@ -486,3 +504,18 @@ def test_buying_climax_at_end_of_uptrend_still_found():
     p.leg(80, 4).leg(91, 3)               # AR low, back up to the EQ
     dist = [r for r in detect_ranges(p.df(), "30m") if r.side == "distribution"]
     assert dist and dist[0].climax_price == pytest.approx(100.3)
+
+
+def test_trend_rule_uses_closes_not_wicks():
+    """An old candle WICKED below the climax but closed above it: still a downtrend
+    by closes, so the climax counts. The reverse (old close below) does not."""
+    def build(old_close):
+        p = Path(130)
+        p.leg(125, 10)
+        p.bar(125, 125.5, 95, old_close)        # old candle: long wick to 95
+        p.leg(130, 4).leg(120, 6).leg(126, 3).leg(100, 4)   # downtrend into SC ~99.7
+        p.leg(140, 4).leg(118, 3)               # AR, back to the EQ
+        return [r for r in detect_ranges(p.df(), "1D") if r.side == "accumulation"
+                and r.climax_price == pytest.approx(99.7)]
+    assert build(old_close=124)                 # wick below, close far above -> valid
+    assert not build(old_close=98)              # an older CLOSE below the climax -> not a new low by closes

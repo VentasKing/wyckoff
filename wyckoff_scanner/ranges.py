@@ -231,12 +231,17 @@ def _detect_accumulation(df, tf, ltf_highs, require_color, side_label, require_b
         prev_low = s
         if not is_new_low:
             continue
-        # tap 1 ends the trend on this timeframe: a selling climax must be the lowest
-        # low of the previous `trend_lookback` candles (in an uptrend a pullback low
-        # never is, so ranges there are drawn from the top down, and vice versa)
+        # tap 1 ends the trend on this timeframe, judged on CLOSES: the selling
+        # climax's close (the lower close of the climax candle and the one before it,
+        # since a climax often wicks and closes off its low) must be below every close
+        # of the previous `trend_lookback` candles.  In an uptrend a pullback never
+        # is, so ranges there are drawn from the top down, and vice versa.
         if trend_lookback:
-            prior = l[max(0, sc.idx - trend_lookback): sc.idx]
-            if len(prior) < min(trend_lookback, MIN_TREND_HISTORY) or prior.min() <= sc.price:
+            k = sc.idx
+            end = max(0, k - 1)
+            climax_close = c[end:k + 1].min()
+            prior = c[max(0, end - trend_lookback): end]
+            if len(prior) < min(trend_lookback, MIN_TREND_HISTORY) or prior.min() <= climax_close:
                 continue
         # valid two-candle leg down into the SC
         leg_start = prev_high.idx if prev_high else 0
