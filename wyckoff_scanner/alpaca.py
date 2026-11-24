@@ -60,8 +60,9 @@ Most common causes:
   2. A space or line break was copied along with a key.
   3. The secret was lost. Alpaca only shows it once; if unsure, click "Regenerate" on the
      Alpaca dashboard (Paper Trading -> API Keys) and copy both values again.
-  4. The secrets were added in Colab but "Notebook access" isn't switched on.
-Keys this run used: key id {kid}, secret length {slen}."""
+  4. On GitHub: the values were pasted into the wrong secret (the secret key is usually
+     about 40 characters long; the key ID is shorter).
+Keys this run used: key id {kid} ({klen} characters), secret length {slen}."""
 
 
 class AlpacaClient:
@@ -144,7 +145,7 @@ class AlpacaClient:
         if err.code in (401, 403):
             kid = (self.key[:4] + "…" + self.key[-2:]) if len(self.key) > 6 else (repr(self.key) or "(empty)")
             return AUTH_HELP.format(code=err.code, body=err.body.strip()[:200], kid=kid,
-                                    slen=len(self.secret))
+                                    klen=len(self.key), slen=len(self.secret))
         return str(err)
 
     def most_actives(self, top: int = 100, by: str = "volume") -> list[str]:
