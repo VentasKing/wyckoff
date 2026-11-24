@@ -205,6 +205,7 @@ def _unmirror(r: Range) -> Range:
 # accumulation detection
 # --------------------------------------------------------------------------
 MIN_TREND_HISTORY = 10
+TRACE: list | None = None     # set to a list to record why each candidate tap 1 was kept or rejected
 
 
 def _detect_accumulation(df, tf, ltf_highs, require_color, side_label, require_bos=False,
@@ -221,6 +222,15 @@ def _detect_accumulation(df, tf, ltf_highs, require_color, side_label, require_b
     sh_prices = [p for _, p in struct_highs]
     tvals = pd.DatetimeIndex(times).as_unit("ns").asi8
 
+    acc = side_label == "accumulation"
+    real = (lambda v: v) if acc else (lambda v: -v)
+    ext, other = ("low", "high") if acc else ("high", "low")
+
+    def note(sc, reason, ok=False):
+        if TRACE is not None:
+            TRACE.append({"tf": tf, "side": side_label, "time": times[sc.idx], "price": real(sc.price),
+                          "ok": ok, "reason": reason})
+
     ranges: list[Range] = []
     prev_low = prev_high = None
     for s in swings:
@@ -229,8 +239,10 @@ def _detect_accumulation(df, tf, ltf_highs, require_color, side_label, require_b
             continue
         sc = s
         is_new_low = prev_low is None or sc.price < prev_low.price
+        before = prev_low
         prev_low = s
         if not is_new_low:
+            note(sc, f"not beyond the previous swing {ext} ({real(before.price):.6g})")
             continue
         # tap 1 ends the trend on this timeframe, judged on CLOSES: the selling
         # climax's close (the lower close of the climax candle and the one before it,
@@ -242,21 +254,33 @@ def _detect_accumulation(df, tf, ltf_highs, require_color, side_label, require_b
             end = max(0, k - 1)
             climax_close = c[end:k + 1].min()
             prior = c[max(0, end - trend_lookback): end]
-            if len(prior) < min(trend_lookback, MIN_TREND_HISTORY) or prior.min() <= climax_close:
+            if len(prior) < min(trend_lookback, MIN_TREND_HISTORY):
+                note(sc, "not enough earlier candles to judge the trend")
+                continue
+            if prior.min() <= climax_close:
+                j = max(0, end - trend_lookback) + int(prior.argmin())
+                note(sc, f"trend rule: the candle on {times[j]:%Y-%m-%d %H:%M} closed "
+                         f"{'lower' if acc else 'higher'} ({real(c[j]):.6g}) within the previous "
+                         f"{trend_lookback} candles, so this is a pullback, not the end of the trend")
                 continue
         # valid two-candle leg down into the SC
         leg_start = prev_high.idx if prev_high else 0
         if not has_two_candle_leg(arrs, leg_start, sc.idx, "down", require_color):
+            note(sc, f"no two-candle leg {'down' if acc else 'up'} into it")
             continue
         # structure the AR must break: latest swing high before the SC
         pos = bisect.bisect_left(sh_times, int(tvals[sc.idx]))
         bos_level = sh_prices[pos - 1] if pos else None
         if require_bos and bos_level is None:
+            note(sc, "no earlier structure for the AR to break (break of structure is required)")
             continue
 
         run_hi = None
+        outcome = "no retrace to the EQ yet"
         for i in range(sc.idx + 1, n):
             if l[i] < sc.price:
+                outcome = (f"price went past it on {times[i]:%Y-%m-%d %H:%M} before retracing to the EQ, "
+                           f"so it was never a range")
                 break
             if run_hi is None or h[i] > h[run_hi]:
                 run_hi = i
@@ -267,7 +291,19 @@ def _detect_accumulation(df, tf, ltf_highs, require_color, side_label, require_b
                 ok = ((broke or not require_bos)
                       and has_two_candle_leg(arrs, sc.idx, run_hi, "up", require_color)
                       and has_two_candle_leg(arrs, run_hi, i, "down", require_color))
+                if not ok:
+                    why = []
+                    if not (broke or not require_bos):
+                        why.append("the AR didn't break structure (required in settings)")
+                    if not has_two_candle_leg(arrs, sc.idx, run_hi, "up", require_color):
+                        why.append(f"no two-candle leg {'up' if acc else 'down'} into the AR")
+                    if not has_two_candle_leg(arrs, run_hi, i, "down", require_color):
+                        why.append(f"no two-candle leg {'down' if acc else 'up'} from the AR to the EQ")
+                    outcome = (f"AR at {real(h[run_hi]):.6g} ({times[run_hi]:%Y-%m-%d}) rejected: " + "; ".join(why))
                 if ok:
+                    outcome = None
+                    note(sc, f"range confirmed: AR {real(h[run_hi]):.6g} on {times[run_hi]:%Y-%m-%d}, "
+                             f"EQ reached {times[i]:%Y-%m-%d}", ok=True)
                     k = deviation_k(tf)
                     size = h[run_hi] - sc.price
                     r = Range(side=side_label, tf=tf, tap2_return=tap2_return, opposite_max=opposite_max,
@@ -282,6 +318,8 @@ def _detect_accumulation(df, tf, ltf_highs, require_color, side_label, require_b
                     _track(r, arrs, times, require_color, ltf=ltf)
                     ranges.append(r)
                 break
+        if outcome is not None:
+            note(sc, outcome)
     _apply_supersede(ranges, arrs, times, require_color, ltf)
     return ranges
 

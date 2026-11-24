@@ -74,11 +74,11 @@ def signal_records(market: str, symbol: str, tv_symbol: str, frames: dict, range
         idx = df.index
         for e in taps:
             t3_time = pd.Timestamp(e.time)
-            if t3_time < hist_cut:
-                continue
             state = ("failed" if e.failed else "confirmed" if e.confirmed else
                      "forming" if e.model == "model1" else "potential")
             live = r.status not in ("completed", "invalidated", "superseded") and not e.failed
+            if not live and t3_time < hist_cut:      # the history window applies to finished setups only
+                continue
             sid = slug(f"{symbol}-{r.tf}-{r.side}-{iso(r.times.get('climax'))}-{e.model}")
             start = max(0, r.climax_idx - 30)
             win = df.iloc[start:][-500:]
@@ -346,5 +346,30 @@ def main(now: datetime | None = None, opener=None) -> dict:
     return out
 
 
+def explain_symbol(symbol: str, tfs: list[str] | None = None) -> None:
+    """Print why the scanner did or didn't find setups on one symbol."""
+    from wyckoff_scanner.explain import explain
+    cfg = json.loads((ROOT / "config.json").read_text())
+    symbol = symbol.strip().upper()
+    if "-" in symbol:                                   # Coinbase pair
+        from wyckoff_scanner.data import coinbase_frames
+        frames = coinbase_frames(symbol, tfs or cfg["crypto"]["timeframes"])
+    else:
+        from wyckoff_scanner.alpaca import TF_SOURCE, AlpacaClient, BarCache, stock_frames, update_cache
+        tfs = tfs or cfg["stocks"]["timeframes"]
+        client = AlpacaClient(feed=cfg["stocks"].get("feed", "sip"))
+        cache = BarCache(str(ROOT / ".bar_cache"))
+        for src in sorted({TF_SOURCE[t] for t in tfs}):
+            update_cache(client, cache, [symbol], src)
+        frames = stock_frames(cache, symbol, tfs)
+    if not frames:
+        print(f"No candles found for {symbol}.")
+        return
+    explain(symbol, frames, cfg["rules"])
+
+
 if __name__ == "__main__":
+    if len(sys.argv) >= 3 and sys.argv[1] == "--explain":
+        explain_symbol(sys.argv[2], sys.argv[3].split() if len(sys.argv) > 3 and sys.argv[3].strip() else None)
+        sys.exit(0)
     sys.exit(0 if main() else 1)

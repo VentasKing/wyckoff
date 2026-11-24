@@ -102,3 +102,24 @@ def test_missing_symbols_are_reported(sandbox):
     out = scan.main(now=datetime(2026, 11, 23, 17, 0, tzinfo=timezone.utc))
     assert out["markets"]["crypto"]["missing"] == ["NOPE-USD"]
     assert out["markets"]["stocks"]["missing"] == []
+
+
+def test_live_setups_are_never_cut_by_the_history_window(sandbox):
+    cfg = json.loads((scan.ROOT / "config.json").read_text())
+    cfg["display"]["history_days"] = 1                  # tiny window: synthetic taps are years old
+    (scan.ROOT / "config.json").write_text(json.dumps(cfg))
+    out = scan.main(now=datetime(2026, 11, 23, 17, 0, tzinfo=timezone.utc))
+    assert out["signals"] and all(s["live"] for s in out["signals"])
+
+
+def test_explain_reports_candidates_and_reasons(capsys):
+    from wyckoff_scanner.explain import explain
+    from test_scanner import confirmed_only
+    from synth import Path
+    p = confirmed_only(); p.leg(142, 4).leg(125, 4).leg(143, 4)       # range high deviated twice
+    q = Path(60); q.leg(90, 30).leg(88, 2).leg(93, 3).leg(86, 3).leg(100, 3).leg(92.5, 3)   # uptrend pullback
+    explain("TEST", {"1D": p.df()}, {})
+    explain("UP", {"1h": q.df(freq="1h")}, {})
+    txt = capsys.readouterr().out
+    assert "range confirmed" in txt and "deviated 2 times" in txt
+    assert "trend rule" in txt and "pullback, not the end of the trend" in txt

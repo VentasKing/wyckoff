@@ -1,0 +1,40 @@
+name: Explain a symbol
+
+# Prints, timeframe by timeframe, every candidate tap 1 and the rule that kept or
+# rejected it, plus what each range did. Doesn't scan, alert or save anything.
+on:
+  workflow_dispatch:
+    inputs:
+      symbol:
+        description: "Ticker or Coinbase pair, e.g. XLF or BTC-USD"
+        required: true
+      timeframes:
+        description: "Timeframes (space-separated). Empty = the ones in config.json"
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+
+jobs:
+  explain:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - name: Reuse downloaded candles
+        uses: actions/cache/restore@v4
+        with:
+          path: .bar_cache
+          key: bars-explain-${{ github.run_id }}
+          restore-keys: bars-
+      - name: Explain
+        env:
+          APCA_API_KEY_ID: ${{ secrets.APCA_API_KEY_ID }}
+          APCA_API_SECRET_KEY: ${{ secrets.APCA_API_SECRET_KEY }}
+        run: python scan.py --explain "${{ github.event.inputs.symbol }}" "${{ github.event.inputs.timeframes }}"
