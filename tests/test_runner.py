@@ -91,3 +91,8 @@ def test_market_error_is_recorded_not_fatal(sandbox, monkeypatch):
     out = scan.main(now=datetime(2026, 11, 23, 17, 0, tzinfo=timezone.utc))
     assert "not set" in out["markets"]["stocks"]["error"]
     assert out["markets"]["crypto"]["error"] is None
+
+
+def test_topic_accepts_full_address():
+    for t in ["wyckoff", "ntfy.sh/wyckoff", "https://ntfy.sh/wyckoff", " https://ntfy.sh/wyckoff/ "]:
+        assert scan.clean_topic(t) == "wyckoff"

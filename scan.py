@@ -262,7 +262,15 @@ def send_ntfy(topic: str, s: dict, what: str, tz: str, opener=None) -> None:
     (opener or urllib.request.urlopen)(req, timeout=20)
 
 
+def clean_topic(topic: str) -> str:
+    """Accept 'wyckoff', 'ntfy.sh/wyckoff' or 'https://ntfy.sh/wyckoff'."""
+    t = (topic or "").strip().rstrip("/")
+    t = re.sub(r"^(https?://)?ntfy\.sh/", "", t)
+    return t
+
+
 def push_alerts(signals, cfg, topic, opener=None) -> int:
+    topic = clean_topic(topic)
     events = alert_events(signals, cfg)
     first_run = not PUSHED.exists()
     seen = set(json.loads(PUSHED.read_text())) if PUSHED.exists() else set()
