@@ -1,7 +1,9 @@
 [
 "AAPL-4h-distribution-2026-11-05T14-30-00Z-model2-liquidity|confirmed",
+"AAVE-USD-15m-accumulation-2026-11-23T22-45-00Z-model2-liquidity|potential",
 "AAVE-USD-1D-accumulation-2026-11-15T00-00-00Z-model2-liquidity|potential",
 "ABBV-4h-accumulation-2026-11-06T14-30-00Z-model2-demand|potential",
+"ADA-USD-1h-distribution-2026-11-19T13-00-00Z-model2-liquidity|potential",
 "ADBE-1D-distribution-2026-06-01T04-00-00Z-model1|confirmed",
 "AMD-1h-distribution-2026-10-28T18-30-00Z-model2-liquidity|confirmed",
 "AMD-30m-accumulation-2026-11-06T17-30-00Z-model1|confirmed",
@@ -30,6 +32,7 @@
 "NET-30m-accumulation-2026-11-17T15-30-00Z-model1|confirmed",
 "NET-4h-distribution-2026-11-13T14-30-00Z-model2-supply|potential",
 "OXY-4h-accumulation-2026-11-10T14-30-00Z-model1|forming",
+"PEPE-USD-1W-accumulation-2025-12-15T00-00-00Z-model1|confirmed",
 "PFE-1W-distribution-2026-03-30T00-00-00Z-model1|confirmed",
 "PG-30m-accumulation-2026-11-13T16-00-00Z-model2-liquidity|confirmed",
 "QCOM-1h-distribution-2026-11-04T20-30-00Z-model1|confirmed",
