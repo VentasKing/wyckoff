@@ -49,6 +49,7 @@ daily, 20–30 min each for 30-min and 5-min history. After that, updates take a
 | Model 2 tap 3 | The first extreme level hit is a **potential** tap 3 (later level hits are noted on it, not new taps). It's **confirmed** when, on the level's timeframe, a candle closes beyond the last two-candle structure high before the tap's extreme. Price going past tap 2 turns it into a Model 1. |
 | Tap 3 confirmation & stop | A tap 3 is *forming* until a later candle closes back past its level (Model 1: back inside the range; M2 liquidity: back above the swept level; M2 demand: back above the zone). Before that, further pushes move its extreme. Once *confirmed*, the extreme is the stop: any trade through it fails the tap. A failed Model 1 invalidates the range. **Model 2 taps are level-hit alerts only** (you judge the break of structure), and are retired if price goes on to make a Model 1. |
 | Red flag | Range high traded through before tap 3 (`range_high_not_fresh`). |
+| Opposite end deviated twice | A second, separate deviation of the range high before tap 3 (price must come back in between, by the tap-2 return rule) invalidates the setup: it works as the opposite model. Limit = `max_opposite_deviations` (default 1). |
 | Invalidated | Close beyond the opposite end's deviation limit before tap 3. |
 | Completed | Close above the range high after a tap 3. |
 | Timeframe | Each TF is scanned; when the same range (same climax & reaction prices) appears on several TFs it's classified on the **highest**, and limits are judged on that TF's closes. |

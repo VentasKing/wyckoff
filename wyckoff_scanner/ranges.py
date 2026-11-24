@@ -81,6 +81,7 @@ class Range:
     tap2_price: float | None = None
     tap2_closed_outside: bool = False
     tap2_return: str = "either"      # how far price must come back to complete tap 2
+    opposite_max: int = 1            # deviations of the opposite end allowed before tap 3
     liquidity_tf: str | None = None  # timeframe the extreme liquidity came from
     demand_tf: str | None = None     # timeframe the extreme demand/supply came from
     demand_src: dict | None = None   # {"ob": ns, "fvg": ns} candles the zone came from
@@ -115,7 +116,7 @@ class Range:
 def detect_ranges(df: pd.DataFrame, tf: str, ltf_swing_highs=None, ltf_swing_lows=None,
                   side: str = "both", require_color: bool = False, require_bos: bool = False,
                   allow_nested: bool = True, tap2_return: str = "either",
-                  ltf_frames=None, trend_lookback: int = 50) -> list[Range]:
+                  ltf_frames=None, trend_lookback: int = 50, opposite_max: int = 1) -> list[Range]:
     """Find every confirmed range on `df` and run its tap state machine to the
     last bar.  `ltf_swing_*` are lists of (time, price) from lower timeframes,
     used for the break-of-structure check.
@@ -129,13 +130,13 @@ def detect_ranges(df: pd.DataFrame, tf: str, ltf_swing_highs=None, ltf_swing_low
     if side in ("both", "accumulation"):
         ltf = [make_frame(t, d) for t, d in ltf_frames]
         out += _detect_accumulation(df, tf, ltf_swing_highs or [], require_color, "accumulation",
-                                    require_bos, tap2_return, ltf, trend_lookback)
+                                    require_bos, tap2_return, ltf, trend_lookback, opposite_max)
     if side in ("both", "distribution"):
         m = mirror(df)
         lows_m = [(t, -p) for t, p in (ltf_swing_lows or [])]   # LTF lows become highs
         ltf_m = [make_frame(t, _mirror_cached(d)) for t, d in ltf_frames]
         rs = _detect_accumulation(m, tf, lows_m, require_color, "distribution", require_bos,
-                                  tap2_return, ltf_m, trend_lookback)
+                                  tap2_return, ltf_m, trend_lookback, opposite_max)
         out += [_unmirror(r) for r in rs]
     return _handle_nested(out, allow_nested)
 
@@ -207,7 +208,7 @@ MIN_TREND_HISTORY = 10
 
 
 def _detect_accumulation(df, tf, ltf_highs, require_color, side_label, require_bos=False,
-                         tap2_return="either", ltf=None, trend_lookback=50):
+                         tap2_return="either", ltf=None, trend_lookback=50, opposite_max=1):
     o, h, l, c = (df[k].to_numpy(dtype=float) for k in ("open", "high", "low", "close"))
     arrs = (o, h, l, c)
     n = len(df)
@@ -269,7 +270,7 @@ def _detect_accumulation(df, tf, ltf_highs, require_color, side_label, require_b
                 if ok:
                     k = deviation_k(tf)
                     size = h[run_hi] - sc.price
-                    r = Range(side=side_label, tf=tf, tap2_return=tap2_return,
+                    r = Range(side=side_label, tf=tf, tap2_return=tap2_return, opposite_max=opposite_max,
                               climax_idx=sc.idx, climax_price=sc.price,
                               reaction_idx=run_hi, reaction_price=h[run_hi], confirm_idx=i,
                               eq=eq, k=k, dev_limit=sc.price - k * size,
@@ -361,6 +362,8 @@ def _track_loop(r: Range, arrs, times, require_color, ltf):
         return e
 
     taps: list[TapEvent] = []   # tap 3 events in play
+    opp = None                  # current deviation of the opposite end: [extreme, idx]
+    opp_count = 0
     liq_done = dz_done = False
     tapped = set()
     end_of = lambda k: int(tns[k + 1]) if k + 1 < len(tns) else BIG
@@ -376,9 +379,26 @@ def _track_loop(r: Range, arrs, times, require_color, ltf):
                 r.status, r.invalid_reason = "invalidated", "closed beyond opposite deviation limit before tap 3"
                 ev("invalidated", None, i, c[i], r.invalid_reason)
                 break
-            if h[i] > ar and "range_high_not_fresh" not in r.red_flags:
-                r.red_flags.append("range_high_not_fresh")
-                ev("red_flag", None, i, h[i], "opposite end traded through before tap 3")
+            # deviations of the opposite end: each one must come back into the range
+            # (same return rule as tap 2) before another one counts
+            if opp is None and h[i] > ar:
+                opp_count += 1
+                opp = [float(h[i]), i]
+                if opp_count == 1 and "range_high_not_fresh" not in r.red_flags:
+                    r.red_flags.append("range_high_not_fresh")
+                    ev("red_flag", None, i, h[i], "opposite end traded through before tap 3")
+                if opp_count > r.opposite_max:
+                    end = "range high" if r.side == "accumulation" else "range low"
+                    r.status = "invalidated"
+                    r.invalid_reason = (f"the {end} was deviated {opp_count} times before tap 3 "
+                                        f"(it works as the opposite model)")
+                    ev("invalidated", None, i, h[i], r.invalid_reason)
+                    break
+            elif opp is not None:
+                if h[i] > opp[0]:
+                    opp[0], opp[1] = float(h[i]), i
+                elif _opposite_returned(r, c, i, opp[1], ar, size):
+                    opp = None
         elif c[i] > ar:
             r.status = "completed"
             ev("completed", None, i, c[i], "closed beyond opposite end after tap 3")
@@ -512,6 +532,21 @@ TAP2_RETURN_MODES = {
     "two_closes": "two consecutive later candles close back inside the range",
     "close": "a later candle closes back inside the range",
 }
+
+
+def _opposite_returned(r: Range, c, i: int, ext_idx: int, ar: float, size: float) -> bool:
+    """Mirror of the tap-2 return rule for a deviation of the opposite end."""
+    if i <= ext_idx:
+        return False
+    quarter = c[i] < ar - 0.25 * size
+    two = i - 1 > ext_idx and c[i] < ar and c[i - 1] < ar
+    if r.tap2_return == "either":
+        return quarter or two
+    if r.tap2_return == "quarter":
+        return quarter
+    if r.tap2_return == "two_closes":
+        return two
+    return c[i] < ar
 
 
 def _tap2_returned(r: Range, c, i: int, sc: float, size: float) -> bool:

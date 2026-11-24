@@ -16,7 +16,8 @@
     "tap2_return": "either",
     "require_ar_break_of_structure": false,
     "allow_nested_ranges": true,
-    "trend_lookback": 50
+    "trend_lookback": 50,
+    "max_opposite_deviations": 1
   },
   "alerts": {
     "tap3_potential": true,

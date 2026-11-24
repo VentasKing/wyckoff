@@ -511,6 +511,7 @@ body.show-settings #dash{display:none}body.show-settings #settings{display:block
     }
     const n = (v, lo, hi, name) => { if (!(Number.isInteger(v) && v >= lo && v <= hi)) errs.push(`${name} must be a whole number from ${lo} to ${hi}.`); };
     n(c.rules.trend_lookback ?? 50, 0, 500, 'Trend lookback');
+    n(c.rules.max_opposite_deviations ?? 1, 0, 5, 'Deviations of the other end');
     n(c.alerts.max_bars_ago, 0, 100, 'Alert window');
     n(c.display.history_days, 1, 60, 'History days');
     return errs;
@@ -605,7 +606,7 @@ body.show-settings #dash{display:none}body.show-settings #settings{display:block
         <div class="muted" style="font-size:12px;margin-top:8px">My list · ${c.stocks.tickers.length} tickers</div>${tags(c.stocks.tickers)}</div>
       <div class="card"><h2>Crypto</h2>${kv('Scanning', c.crypto.enabled ? esc(c.crypto.universe) : 'Off')}${kv('Timeframes', esc(c.crypto.timeframes.join(' · ')))}
         <div class="muted" style="font-size:12px;margin-top:8px">My list · ${c.crypto.products.length} coins</div>${tags(c.crypto.products)}</div>
-      <div class="card"><h2>Model rules</h2>${kv('Tap 2 is complete when price…', esc(T2[c.rules.tap2_return] || c.rules.tap2_return))}${kv('Require the AR to break structure', yes(c.rules.require_ar_break_of_structure))}${kv('Allow ranges inside larger ranges', yes(c.rules.allow_nested_ranges))}${kv('Tap 1 must close beyond every close of the last', (c.rules.trend_lookback ?? 50) + ' candles')}</div>
+      <div class="card"><h2>Model rules</h2>${kv('Tap 2 is complete when price…', esc(T2[c.rules.tap2_return] || c.rules.tap2_return))}${kv('Require the AR to break structure', yes(c.rules.require_ar_break_of_structure))}${kv('Allow ranges inside larger ranges', yes(c.rules.allow_nested_ranges))}${kv('Tap 1 must close beyond every close of the last', (c.rules.trend_lookback ?? 50) + ' candles')}${kv('Deviations of the other end allowed', c.rules.max_opposite_deviations ?? 1)}</div>
       <div class="card"><h2>Phone alerts</h2>${kv('Tap 3 potential', yes(c.alerts.tap3_potential))}${kv('Tap 3 confirmed', yes(c.alerts.tap3_confirmed))}${kv('Model 1 forming', yes(c.alerts.model1_forming))}${kv('Only taps from the last', c.alerts.max_bars_ago + ' bars')}${kv('Time zone', esc(c.display.timezone))}</div>`;
   }
 
@@ -623,6 +624,7 @@ body.show-settings #dash{display:none}body.show-settings #settings{display:block
     }
     const d = draft;
     d.rules.trend_lookback = d.rules.trend_lookback ?? 50;
+    d.rules.max_opposite_deviations = d.rules.max_opposite_deviations ?? 1;
     g.innerHTML = `
       <div class="card"><h2>Stocks</h2><div class="muted" style="font-size:12px;margin-top:-6px">Alpaca free tier, ~15 min delayed · weekdays 9:00–17:00 New York</div>
         ${sw('stocks.enabled', 'Scan stocks')}
@@ -638,7 +640,8 @@ body.show-settings #dash{display:none}body.show-settings #settings{display:block
         ${selField('rules.tap2_return', 'Tap 2 is complete when price…', Object.keys(T2), T2)}
         ${sw('rules.require_ar_break_of_structure', 'Require the AR to break structure', 'Off: keep these ranges and flag them')}
         ${sw('rules.allow_nested_ranges', 'Allow ranges inside larger ranges', 'On: keep them and flag them')}
-        ${numf('rules.trend_lookback', 'Trend lookback (candles)', 'Tap 1 must close beyond every close of this many candles. 0 turns it off.', 50)}</div>
+        ${numf('rules.trend_lookback', 'Trend lookback (candles)', 'Tap 1 must close beyond every close of this many candles. 0 turns it off.', 50)}
+        ${numf('rules.max_opposite_deviations', 'Deviations of the other end allowed', 'Before tap 3. One = red flag only; more ignores the setup. 0 = the other end must stay fresh.', 1)}</div>
       <div class="card"><h2>Phone alerts</h2>
         ${sw('alerts.tap3_potential', 'Tap 3 potential', 'An extreme level or zone was hit')}
         ${sw('alerts.tap3_confirmed', 'Tap 3 confirmed', 'Structure broke after the tap')}

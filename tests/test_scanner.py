@@ -519,3 +519,45 @@ def test_trend_rule_uses_closes_not_wicks():
                 and r.climax_price == pytest.approx(99.7)]
     assert build(old_close=124)                 # wick below, close far above -> valid
     assert not build(old_close=98)              # an older CLOSE below the climax -> not a new low by closes
+
+
+def test_opposite_end_deviated_once_is_a_red_flag_only():
+    p = confirmed_only()                     # SC 99.7, AR 140.3, return level 130.15
+    p.leg(142, 4).leg(125, 4)                # one deviation of the range high, back in
+    r = only(detect_ranges(p.df(), "4h"))
+    assert r.status == "awaiting_tap2" and "range_high_not_fresh" in r.red_flags
+
+
+def test_opposite_end_deviated_twice_invalidates():
+    """BAT case: the range high was deviated twice, so the accumulation also reads
+    as a distribution. Ignore it."""
+    p = confirmed_only()
+    p.leg(142, 4).leg(125, 4)                # deviation 1, back in
+    p.leg(143, 4)                            # deviation 2
+    p.leg(103, 6).bar(103, 103.5, 96, 102).bar(102, 113, 101.5, 112)   # a later tap 2
+    r = only(detect_ranges(p.df(), "4h"))
+    assert r.status == "invalidated" and "range high was deviated 2 times" in r.invalid_reason
+    assert r.tap2_price is None              # nothing after it counts
+
+
+def test_back_to_back_wicks_are_one_deviation():
+    p = confirmed_only()
+    p.leg(139, 3)
+    p.bar(139, 141.5, 138, 139.5).bar(139.5, 141.8, 138.5, 139)        # two wicks, no return between
+    p.leg(125, 4)
+    r = only(detect_ranges(p.df(), "4h"))
+    assert r.status == "awaiting_tap2"
+
+
+def test_fresh_opposite_end_can_be_required():
+    p = confirmed_only()
+    p.leg(142, 4).leg(125, 4)
+    r = only(detect_ranges(p.df(), "4h", opposite_max=0))
+    assert r.status == "invalidated"
+
+
+def test_distribution_mirror_uses_range_low_wording():
+    p = confirmed_only()
+    p.leg(142, 4).leg(125, 4).leg(143, 4)
+    r = only(detect_ranges(mirror_prices(p.df()), "4h"), side="distribution")
+    assert r.status == "invalidated" and "range low" in r.invalid_reason
