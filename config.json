@@ -19,7 +19,9 @@
     "trend_lookback": 50,
     "max_opposite_deviations": 0,
     "min_tap3_spacing": 0.25,
-    "tap3_zone_tolerance": 0.05
+    "tap3_zone_tolerance": 0.05,
+    "bojan_min_wick": 0.3,
+    "bojan_timeframes_below": 2
   },
   "alerts": {
     "tap3_potential": true,

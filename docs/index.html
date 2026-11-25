@@ -117,6 +117,7 @@ body.show-settings #dash{display:none}body.show-settings #settings{display:block
 .spin{width:12px;height:12px;border-radius:50%;border:2px solid #4C9EFF;border-right-color:transparent;animation:spin .8s linear infinite}
 @keyframes spin{to{transform:rotate(360deg)}}
 @media (prefers-reduced-motion:reduce){.topnote{transition:none}.spin{animation:none}}
+.bbadge{color:#E879C0;background:rgba(232,121,192,.12);border:1px solid rgba(232,121,192,.35);border-radius:999px;padding:1px 7px;font-size:11px;white-space:nowrap}
 .zbadge{color:#4CC38A;background:rgba(76,195,138,.12);border:1px solid rgba(76,195,138,.35);border-radius:999px;padding:1px 7px;font-size:11px;white-space:nowrap}
   .donebadge{font-size:11px;font-weight:600;color:#8BD5A6;border:1px solid #24503A;background:#13261B;padding:2px 7px;border-radius:999px}
 .toast button{margin-left:10px;border:0;background:none;color:#7DB8FF;font-weight:700;cursor:pointer;padding:4px 6px}
@@ -348,7 +349,7 @@ body.show-settings #dash{display:none}body.show-settings #settings{display:block
           <span class="muted" style="font-size:11px">${s.market === 'stocks' ? 'Stock' : 'Crypto'}</span></span>
           ${isDone(s.id) ? '<span class="donebadge">✓ Done</span>' : `<span class="state st-${s.state}">${NICE[s.state]}</span>`}</div>
         <div class="r2"><span style="color:var(--soft)">${esc(s.model_name)}${s.level_tf ? ' (' + esc(s.level_tf) + ')' : ''}</span><span class="muted">${s.bars_ago === 0 ? 'this bar' : s.bars_ago + ' bar' + (s.bars_ago === 1 ? '' : 's') + ' ago'}</span></div>
-        <div class="r3"><span>${s.level != null ? 'level ' + num(s.level) : s.stop != null ? 'stop ' + num(s.stop) : ''}</span><span style="display:flex;gap:8px">${(s.tap3_zones || []).length ? `<span class="zbadge" title="Tap 3 at a fresh ${s.side === 'accumulation' ? 'demand' : 'supply'} order block">◆ ${s.tap3_zones.map((z) => esc(z.tf)).join(' · ')} ${s.side === 'accumulation' ? 'demand' : 'supply'}</span>` : ''}${s.flags.length ? `<span style="color:var(--amber)">⚑ ${s.flags.length}</span>` : ''}</span></div>
+        <div class="r3"><span>${s.level != null ? 'level ' + num(s.level) : s.stop != null ? 'stop ' + num(s.stop) : ''}</span><span style="display:flex;gap:8px">${(s.bojans || []).length ? `<span class="bbadge" title="Bojan ${s.side === 'accumulation' ? 'low' : 'high'}">◉ Bojan</span>` : ''}${(s.tap3_zones || []).length ? `<span class="zbadge" title="Tap 3 at a fresh ${s.side === 'accumulation' ? 'demand' : 'supply'} order block">◆ ${s.tap3_zones.map((z) => esc(z.tf)).join(' · ')} ${s.side === 'accumulation' ? 'demand' : 'supply'}</span>` : ''}${s.flags.length ? `<span style="color:var(--amber)">⚑ ${s.flags.length}</span>` : ''}</span></div>
       </button>`).join('');
     rows.querySelectorAll('.sig').forEach((el) => el.onclick = () => { location.hash = el.dataset.id; });
 
@@ -382,6 +383,7 @@ body.show-settings #dash{display:none}body.show-settings #settings{display:block
             <div class="dtitle"><h1>${esc(s.symbol)}</h1><span class="tf" style="font-size:12px;padding:3px 7px">${esc(s.tf)}</span>
               <span class="sidepill ${acc ? 'sp-a' : 'sp-d'}">${acc ? '▲ Accumulation' : '▼ Distribution'}</span>
               <span class="state st-${s.state}" style="font-size:12px;padding:3px 8px">Tap 3 · ${NICE[s.state]}</span>
+              ${(s.bojans || []).length ? `<span class="bbadge" style="font-size:12px;padding:3px 8px">◉ Bojan ${acc ? 'low' : 'high'} · ${s.bojans.map((b) => esc(bojanText(s, b))).join(' · ')}</span>` : ''}
               ${(s.tap3_zones || []).length ? `<span class="zbadge" style="font-size:12px;padding:3px 8px">◆ Tap 3 at fresh ${s.tap3_zones.map((z) => esc(z.tf)).join(' · ')} ${acc ? 'demand' : 'supply'}</span>` : ''}</div>
             <div class="muted" style="margin-top:6px;font-size:13px">${esc(s.model_name)}${s.level_tf ? ' (' + esc(s.level_tf) + ')' : ''} · tap 3 ${esc(when(s.time))}${statusNote ? ' · <span style="color:#F08C8C">' + esc(statusNote) + '</span>' : ''}</div>
           </div>
@@ -398,6 +400,7 @@ body.show-settings #dash{display:none}body.show-settings #settings{display:block
           ${s.zone ? '<span><span style="width:16px;border-top:2px solid #F5A524"></span>Extreme ' + (acc ? 'demand' : 'supply') + ' zone</span>' : ''}
           ${s.liquidity ? '<span><span style="width:16px;border-top:2px dashed #B48CF2"></span>Extreme liquidity</span>' : ''}
           ${(s.tap3_zones || []).length ? '<span><span style="width:16px;border-top:2px solid #4CC38A"></span>Order block at tap 3</span>' : ''}
+          ${(s.bojans || []).some((b) => b.tf === s.tf) ? '<span><span style="width:8px;height:8px;border-radius:50%;background:#E879C0"></span>Bojan</span>' : ''}
           <span class="muted">Times in ${esc(tz())}</span>
         </div>
       </div>
@@ -427,11 +430,17 @@ body.show-settings #dash{display:none}body.show-settings #settings{display:block
     drawChart(s);
   }
 
+  function bojanText(s, b) {
+    const acc = s.side === 'accumulation';
+    return (b.where === 'tap3' ? (acc ? 'spring' : 'UTAD') : (acc ? 'LPS' : 'LPSY')) + ' ' + b.tf;
+  }
+
   function sources(s) {
     const acc = s.side === 'accumulation', out = [];
     if (s.liquidity) out.push(`<div class="src"><b>Extreme liquidity · ${esc(s.liquidity.tf)}</b><div>${num(s.liquidity.level)} — the first two-candle structure ${acc ? 'low' : 'high'} after tap 2${s.liquidity.low ? ', candle at ' + esc(when(s.liquidity.low)) : ''}</div></div>`);
     if (s.zone) out.push(`<div class="src"><b>Extreme ${acc ? 'demand' : 'supply'} · ${esc(s.zone.tf)}</b><div>${num(s.zone.lo)} – ${num(s.zone.hi)} — order block at ${esc(when(s.zone.ob))}, fair value gap completed ${esc(when(s.zone.fvg))}</div></div>`);
     for (const z of (s.tap3_zones || [])) { out.push(`<div class="src"><b>Tap 3 ${z.inside ? 'in' : 'near'} fresh ${acc ? 'demand' : 'supply'} · ${esc(z.tf)}</b><div>${num(z.lo)} – ${num(z.hi)} — order block at ${esc(when(z.ob))}, fair value gap completed ${esc(when(z.fvg))}${z.inside ? '' : `; tap 3 stopped ${num(z.distance)} away`}. Untouched until the leg into tap 3.</div></div>`); }
+    for (const b of (s.bojans || [])) out.push(`<div class="src"><b>Bojan ${acc ? 'low' : 'high'} at the ${esc(bojanText(s, b).replace(/ \S+$/, ''))} · ${esc(b.tf)}</b><div>${b.candles} candles from ${esc(when(b.start))}; wick ${acc ? 'low' : 'high'} ${num(b.price)} at ${esc(when(b.time))}${b.tf === s.tf ? '' : ` (open the ${esc(b.tf)} chart in TradingView to see it)`}. Aggressive entry possible.</div></div>`);
     if (s.model === 'model1') out.push(`<div class="src"><b>Model 1</b><div>Tap 3 deviated the tap 2 extreme (${num(s.range.tap2)}). Once confirmed, its extreme is the stop.</div></div>`);
     return out.join('') || '<div class="muted" style="font-size:13px">No Model 2 levels found for this range.</div>';
   }
@@ -470,7 +479,8 @@ body.show-settings #dash{display:none}body.show-settings #settings{display:block
     const marks = s.markers.map((m) => ({ ...m, t: Math.floor(new Date(m.time) / 1000) })).filter((m) => times.has(m.t))
       .sort((a, b) => a.t - b.t).map((m) => {
         const below = m.kind === 'ar' ? !acc : acc;
-        const col = m.kind === 'ar' ? '#8FB4E0' : m.kind === 'tap3' ? (s.state === 'failed' ? '#8A94A3' : '#F5A524') : '#F5A524';
+        const col = m.kind === 'ar' ? '#8FB4E0' : m.kind === 'bojan' ? '#E879C0' : m.kind === 'tap3' ? (s.state === 'failed' ? '#8A94A3' : '#F5A524') : '#F5A524';
+        if (m.kind === 'bojan') return { time: m.t, position: below ? 'belowBar' : 'aboveBar', color: col, shape: 'circle', text: m.label };
         return { time: m.t, position: below ? 'belowBar' : 'aboveBar', color: col, shape: below ? 'arrowUp' : 'arrowDown', text: m.label };
       });
     ser.setMarkers(marks);
@@ -586,6 +596,8 @@ body.show-settings #dash{display:none}body.show-settings #settings{display:block
     const n = (v, lo, hi, name) => { if (!(Number.isInteger(v) && v >= lo && v <= hi)) errs.push(`${name} must be a whole number from ${lo} to ${hi}.`); };
     n(c.rules.trend_lookback ?? 50, 0, 500, 'Trend lookback');
     n(c.rules.max_opposite_deviations ?? 1, 0, 5, 'Deviations of the other end');
+    { const v = c.rules.bojan_min_wick ?? 0.3; if (!(typeof v === 'number' && v > 0 && v < 1)) errs.push('Bojan wick share must be between 0 and 1.'); }
+    n(c.rules.bojan_timeframes_below ?? 2, 0, 6, 'Bojan timeframes below');
     { const v = c.rules.tap3_zone_tolerance ?? 0.05; if (!(typeof v === 'number' && v >= 0 && v <= 1)) errs.push('Order block tolerance must be a number from 0 to 1.'); }
     { const v = c.rules.min_tap3_spacing ?? 0.25; if (!(typeof v === 'number' && v >= 0 && v <= 2)) errs.push('Tap 3 spacing must be a number from 0 to 2.'); }
     n(c.alerts.max_bars_ago, 0, 100, 'Alert window');
@@ -706,6 +718,8 @@ body.show-settings #dash{display:none}body.show-settings #settings{display:block
     d.rules.max_opposite_deviations = d.rules.max_opposite_deviations ?? 1;
     d.rules.min_tap3_spacing = d.rules.min_tap3_spacing ?? 0.25;
     d.rules.tap3_zone_tolerance = d.rules.tap3_zone_tolerance ?? 0.05;
+    d.rules.bojan_min_wick = d.rules.bojan_min_wick ?? 0.3;
+    d.rules.bojan_timeframes_below = d.rules.bojan_timeframes_below ?? 2;
     g.innerHTML = `
       <div class="card" style="grid-column:1/-1"><h2>Scanning</h2>
         ${sw('schedule.automatic', 'Automatic scans every 30 minutes', 'Off: scans only run when you press Scan now (stocks on weekdays 9:00–17:00 New York, crypto around the clock)')}</div>
@@ -726,7 +740,9 @@ body.show-settings #dash{display:none}body.show-settings #settings{display:block
         ${numf('rules.trend_lookback', 'Trend lookback (candles)', 'Tap 1 must close beyond every close of this many candles. 0 turns it off.', 50)}
         ${numf('rules.max_opposite_deviations', 'Deviations of the other end allowed', 'Before tap 3. One = red flag only; more ignores the setup. 0 = the other end must stay fresh.', 1)}
         ${numf('rules.min_tap3_spacing', 'Tap 3 spacing (fraction of tap 1 → tap 2)', 'Candles from tap 2 to tap 3 must be at least this share of the candles from tap 1 to tap 2. 0.25 = a quarter. A new low sooner than that extends tap 2. 0 = off.', 0.25, 0.05)}
-        ${numf('rules.tap3_zone_tolerance', 'Order block at tap 3: how close counts (fraction of the range)', 'A Model 1 tap 3 gets the ◆ badge when its extreme is inside a fresh order block from any timeframe, or within this share of the range of one. 0.05 = 5%.', 0.05, 0.01)}</div>
+        ${numf('rules.tap3_zone_tolerance', 'Order block at tap 3: how close counts (fraction of the range)', 'A Model 1 tap 3 gets the ◆ badge when its extreme is inside a fresh order block from any timeframe, or within this share of the range of one. 0.05 = 5%.', 0.05, 0.01)}
+        ${numf('rules.bojan_min_wick', 'Bojan: wick share of each candle', 'Every candle in a Bojan needs at least this share of its range as a wick on the spring/LPS side (the candle with the extreme wick needs half). 0.3 = 30%.', 0.3, 0.05)}
+        ${numf('rules.bojan_timeframes_below', 'Bojan: timeframes below the model to check', 'The model’s own timeframe plus this many below it. 2 on a weekly model = weekly, daily and 4h.', 2)}</div>
       <div class="card"><h2>Phone alerts</h2>
         ${sw('alerts.tap3_potential', 'Tap 3 potential', 'An extreme level or zone was hit')}
         ${sw('alerts.tap3_confirmed', 'Tap 3 confirmed', 'Structure broke after the tap')}

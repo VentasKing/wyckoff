@@ -27,6 +27,7 @@ import numpy as np
 import pandas as pd
 
 from wyckoff_scanner.alerts import tradingview_url
+from wyckoff_scanner.bojan import bojans_for_tap3
 from wyckoff_scanner.confluence import zones_at_tap3
 from wyckoff_scanner.timeframes import scan_frames
 
@@ -117,6 +118,20 @@ def signal_records(market: str, symbol: str, tv_symbol: str, frames: dict, range
                                "distance": rnd(z["distance"]), "ob": iso(z["ob"]), "fvg": iso(z["fvg"])}
                               for z in zones_at_tap3(frames, r.side, idx[min(hi_i, len(idx) - 1)],
                                                      e.extreme if e.extreme is not None else e.price, tol)]
+            ei = min(ext_i, len(idx) - 1)
+            ext_end = idx[ei + 1] if ei + 1 < len(idx) else idx[ei] + (idx[-1] - idx[-2] if len(idx) > 1 else pd.Timedelta(0))
+            rules_ = cfg["rules"]
+            btol = rules_.get("tap3_zone_tolerance", 0.05) * abs(r.reaction_price - r.climax_price)
+            bojans = [{"where": b["where"], "tf": b["tf"], "start": iso(b["start"]), "end": iso(b["end"]),
+                       "time": iso(b["low_time"]), "price": rnd(b["price"]), "candles": b["candles"]}
+                      for b in bojans_for_tap3(frames, r.tf, r.side, idx[ei], ext_end,
+                                               e.extreme if e.extreme is not None else e.price, btol,
+                                               lps=not e.failed, min_wick=rules_.get("bojan_min_wick", 0.3),
+                                               depth=int(rules_.get("bojan_timeframes_below", 2)))]
+            for b in bojans:
+                if b["tf"] == r.tf:
+                    markers.append({"time": b["time"], "price": b["price"], "kind": "bojan",
+                                    "label": "Bojan" if b["where"] == "tap3" else ("Bojan LPS" if acc else "Bojan LPSY")})
             liq = None
             if r.liquidity_level is not None:
                 liq = {"level": rnd(r.liquidity_level), "tf": r.liquidity_tf,
@@ -157,7 +172,7 @@ def signal_records(market: str, symbol: str, tv_symbol: str, frames: dict, range
                           "model1_limit": rnd(r.model1_limit), "tap2": rnd(r.tap2_price),
                           "tap2_return": rnd(q) if r.tap2_return in ("either", "quarter") else None,
                           "tap2_closed_outside": r.tap2_closed_outside},
-                "zone": zone, "tap3_zones": tap3_zones, "liquidity": liq, "markers": markers, "timeline": timeline,
+                "zone": zone, "tap3_zones": tap3_zones, "bojans": bojans, "liquidity": liq, "markers": markers, "timeline": timeline,
                 "candles": candles,
             })
     return out
@@ -280,6 +295,9 @@ def send_ntfy(topic: str, s: dict, what: str, tz: str, opener=None) -> None:
         kind = "demand" if s["side"] == "accumulation" else "supply"
         lines.append(f"+ Tap 3 at fresh {kind}: " + ", ".join(
             f"{z['tf']} {z['lo']:g}-{z['hi']:g}" + ("" if z["inside"] else " (near)") for z in s["tap3_zones"]))
+    if s.get("bojans"):
+        lps = "LPS" if s["side"] == "accumulation" else "LPSY"
+        lines.append("+ Bojan: " + ", ".join(f"{'tap 3' if b['where'] == 'tap3' else lps} {b['tf']}" for b in s["bojans"]))
     if s["flags"]:
         lines.append("Flags: " + ", ".join(s["flags"]))
     title = f"{s['symbol']} {s['tf']} - {what}"

@@ -617,3 +617,40 @@ def test_tap3_into_fresh_order_block():
     m = pd.DataFrame({"open": -df["open"], "high": -df["low"], "low": -df["high"], "close": -df["close"]})
     zs = zone_at_tap3({"30m": m}, "distribution", m.index[6], -103.2, tol=1.0)
     assert zs and (zs["lo"], zs["hi"]) == (-109.5, -100)
+
+
+def _bojan_df(rows, freq="1h"):
+    import pandas as pd
+    return pd.DataFrame(rows, columns=["open", "high", "low", "close"],
+                        index=pd.date_range("2026-01-01", periods=len(rows), freq=freq, tz="UTC"))
+
+
+def test_bojan_low_shapes_from_the_guide():
+    import numpy as np
+    from wyckoff_scanner.bojan import find_bojans
+    # guide, top-left: middle wick lowest, closes hold
+    df = _bojan_df([(120, 121, 100, 111), (111, 115, 94, 112), (112, 117, 97, 113)])
+    a = [df[k].to_numpy(float) for k in ("open", "high", "low", "close")]
+    assert find_bojans(*a) == [(0, 2, 1)]
+    # top-middle: each wick lower
+    df = _bojan_df([(120, 121, 100, 109), (109, 114, 97, 112), (112, 118, 94, 113)])
+    assert find_bojans(*[df[k].to_numpy(float) for k in ("open", "high", "low", "close")]) == [(0, 2, 2)]
+    # no sweep, or a close below the first low -> nothing
+    df = _bojan_df([(120, 121, 100, 110), (110, 115, 101, 112), (112, 117, 102, 113)])
+    assert find_bojans(*[df[k].to_numpy(float) for k in ("open", "high", "low", "close")]) == []
+    df = _bojan_df([(120, 121, 100, 111), (111, 115, 94, 99), (99, 117, 95, 113)])
+    assert find_bojans(*[df[k].to_numpy(float) for k in ("open", "high", "low", "close")]) == []
+
+
+def test_bojan_at_tap3_and_lps():
+    from wyckoff_scanner.bojan import bojans_for_tap3
+    rows = [(130, 131, 125, 126)] * 3 + [(120, 121, 100, 111), (111, 115, 94, 112), (112, 117, 97, 113),
+                                          (113, 125, 112, 124), (124, 126, 118, 125),
+                                          (125, 126, 108, 121), (121, 123, 104, 122), (122, 124, 106, 123),
+                                          (123, 130, 122, 129)]
+    df = _bojan_df(rows)
+    got = bojans_for_tap3({"1h": df}, "1h", "accumulation", df.index[4], df.index[5], 94, tol=1)
+    assert [(b["where"], b["tf"], b["price"]) for b in got] == [("tap3", "1h", 94), ("lps", "1h", 104)]
+    m = _bojan_df([(-o, -l, -h, -c) for o, h, l, c in rows])
+    got = bojans_for_tap3({"1h": m}, "1h", "distribution", m.index[4], m.index[5], -94, tol=1)
+    assert [(b["where"], b["price"]) for b in got] == [("tap3", -94), ("lps", -104)]

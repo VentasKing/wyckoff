@@ -65,6 +65,8 @@ flood. From then on you get alerts for new ones.
 | `rules.require_ar_break_of_structure` | `true` / `false` |
 | `rules.allow_nested_ranges` | `true` / `false` |
 | `rules.tap3_zone_tolerance` | a Model 1 tap 3 is marked ◆ when its extreme is inside a fresh order block (any scanned timeframe, OB that created a FVG, untouched until the leg into tap 3) or within this fraction of the range of one (default 0.05) |
+| `rules.bojan_min_wick` | Bojan low/high: share of each candle's range that must be wick on the spring side (default 0.3); the candle with the extreme wick needs 0.5 |
+| `rules.bojan_timeframes_below` | Bojans are looked for on the model's timeframe and this many below it (default 2) |
 | `rules.min_tap3_spacing` | tap 2 → tap 3 must take at least this fraction of the candles from tap 1 → tap 2 (default 0.25). A new low sooner than that counts as tap 2 extending; Model 2 hits sooner than that are ignored. 0 = off |
 | `rules.max_opposite_deviations` | how many separate deviations of the other end of the range are allowed before tap 3 (default 1 = red flag; one more ignores the setup; 0 = must stay fresh) |
 | `rules.trend_lookback` | tap 1 must close below (selling climax) or above (buying climax) every close of this many previous candles, so ranges follow the trend; `0` turns it off |
