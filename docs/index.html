@@ -348,7 +348,7 @@ body.show-settings #dash{display:none}body.show-settings #settings{display:block
           <span class="muted" style="font-size:11px">${s.market === 'stocks' ? 'Stock' : 'Crypto'}</span></span>
           ${isDone(s.id) ? '<span class="donebadge">✓ Done</span>' : `<span class="state st-${s.state}">${NICE[s.state]}</span>`}</div>
         <div class="r2"><span style="color:var(--soft)">${esc(s.model_name)}${s.level_tf ? ' (' + esc(s.level_tf) + ')' : ''}</span><span class="muted">${s.bars_ago === 0 ? 'this bar' : s.bars_ago + ' bar' + (s.bars_ago === 1 ? '' : 's') + ' ago'}</span></div>
-        <div class="r3"><span>${s.level != null ? 'level ' + num(s.level) : s.stop != null ? 'stop ' + num(s.stop) : ''}</span><span style="display:flex;gap:8px">${s.tap3_zone ? `<span class="zbadge" title="Tap 3 ${s.tap3_zone.inside ? 'in' : 'near'} a fresh ${esc(s.tap3_zone.tf)} ${s.side === 'accumulation' ? 'demand' : 'supply'} order block">◆ ${esc(s.tap3_zone.tf)} ${s.side === 'accumulation' ? 'demand' : 'supply'}</span>` : ''}${s.flags.length ? `<span style="color:var(--amber)">⚑ ${s.flags.length}</span>` : ''}</span></div>
+        <div class="r3"><span>${s.level != null ? 'level ' + num(s.level) : s.stop != null ? 'stop ' + num(s.stop) : ''}</span><span style="display:flex;gap:8px">${(s.tap3_zones || []).length ? `<span class="zbadge" title="Tap 3 at a fresh ${s.side === 'accumulation' ? 'demand' : 'supply'} order block">◆ ${s.tap3_zones.map((z) => esc(z.tf)).join(' · ')} ${s.side === 'accumulation' ? 'demand' : 'supply'}</span>` : ''}${s.flags.length ? `<span style="color:var(--amber)">⚑ ${s.flags.length}</span>` : ''}</span></div>
       </button>`).join('');
     rows.querySelectorAll('.sig').forEach((el) => el.onclick = () => { location.hash = el.dataset.id; });
 
@@ -382,7 +382,7 @@ body.show-settings #dash{display:none}body.show-settings #settings{display:block
             <div class="dtitle"><h1>${esc(s.symbol)}</h1><span class="tf" style="font-size:12px;padding:3px 7px">${esc(s.tf)}</span>
               <span class="sidepill ${acc ? 'sp-a' : 'sp-d'}">${acc ? '▲ Accumulation' : '▼ Distribution'}</span>
               <span class="state st-${s.state}" style="font-size:12px;padding:3px 8px">Tap 3 · ${NICE[s.state]}</span>
-              ${s.tap3_zone ? `<span class="zbadge" style="font-size:12px;padding:3px 8px">◆ Tap 3 ${s.tap3_zone.inside ? 'in' : 'near'} fresh ${esc(s.tap3_zone.tf)} ${acc ? 'demand' : 'supply'}</span>` : ''}</div>
+              ${(s.tap3_zones || []).length ? `<span class="zbadge" style="font-size:12px;padding:3px 8px">◆ Tap 3 at fresh ${s.tap3_zones.map((z) => esc(z.tf)).join(' · ')} ${acc ? 'demand' : 'supply'}</span>` : ''}</div>
             <div class="muted" style="margin-top:6px;font-size:13px">${esc(s.model_name)}${s.level_tf ? ' (' + esc(s.level_tf) + ')' : ''} · tap 3 ${esc(when(s.time))}${statusNote ? ' · <span style="color:#F08C8C">' + esc(statusNote) + '</span>' : ''}</div>
           </div>
           <div class="btns" style="display:flex;gap:8px;flex-wrap:wrap">
@@ -397,7 +397,7 @@ body.show-settings #dash{display:none}body.show-settings #settings{display:block
           <span><span style="width:16px;border-top:2px dashed #E06C6C"></span>Deviation limit</span>
           ${s.zone ? '<span><span style="width:16px;border-top:2px solid #F5A524"></span>Extreme ' + (acc ? 'demand' : 'supply') + ' zone</span>' : ''}
           ${s.liquidity ? '<span><span style="width:16px;border-top:2px dashed #B48CF2"></span>Extreme liquidity</span>' : ''}
-          ${s.tap3_zone ? '<span><span style="width:16px;border-top:2px solid #4CC38A"></span>Order block at tap 3</span>' : ''}
+          ${(s.tap3_zones || []).length ? '<span><span style="width:16px;border-top:2px solid #4CC38A"></span>Order block at tap 3</span>' : ''}
           <span class="muted">Times in ${esc(tz())}</span>
         </div>
       </div>
@@ -431,7 +431,7 @@ body.show-settings #dash{display:none}body.show-settings #settings{display:block
     const acc = s.side === 'accumulation', out = [];
     if (s.liquidity) out.push(`<div class="src"><b>Extreme liquidity · ${esc(s.liquidity.tf)}</b><div>${num(s.liquidity.level)} — the first two-candle structure ${acc ? 'low' : 'high'} after tap 2${s.liquidity.low ? ', candle at ' + esc(when(s.liquidity.low)) : ''}</div></div>`);
     if (s.zone) out.push(`<div class="src"><b>Extreme ${acc ? 'demand' : 'supply'} · ${esc(s.zone.tf)}</b><div>${num(s.zone.lo)} – ${num(s.zone.hi)} — order block at ${esc(when(s.zone.ob))}, fair value gap completed ${esc(when(s.zone.fvg))}</div></div>`);
-    if (s.tap3_zone) { const z = s.tap3_zone; out.push(`<div class="src"><b>Tap 3 ${z.inside ? 'in' : 'near'} fresh ${acc ? 'demand' : 'supply'} · ${esc(z.tf)}</b><div>${num(z.lo)} – ${num(z.hi)} — order block at ${esc(when(z.ob))}, fair value gap completed ${esc(when(z.fvg))}${z.inside ? '' : `; tap 3 stopped ${num(z.distance)} away`}. Untouched until the leg into tap 3.</div></div>`); }
+    for (const z of (s.tap3_zones || [])) { out.push(`<div class="src"><b>Tap 3 ${z.inside ? 'in' : 'near'} fresh ${acc ? 'demand' : 'supply'} · ${esc(z.tf)}</b><div>${num(z.lo)} – ${num(z.hi)} — order block at ${esc(when(z.ob))}, fair value gap completed ${esc(when(z.fvg))}${z.inside ? '' : `; tap 3 stopped ${num(z.distance)} away`}. Untouched until the leg into tap 3.</div></div>`); }
     if (s.model === 'model1') out.push(`<div class="src"><b>Model 1</b><div>Tap 3 deviated the tap 2 extreme (${num(s.range.tap2)}). Once confirmed, its extreme is the stop.</div></div>`);
     return out.join('') || '<div class="muted" style="font-size:13px">No Model 2 levels found for this range.</div>';
   }
@@ -463,7 +463,7 @@ body.show-settings #dash{display:none}body.show-settings #settings{display:block
     pl(r.dev_limit, '#E06C6C', L.Dashed, 'dev limit');
     if (s.model === 'model1') pl(r.model1_limit, '#E06C6C', L.SparseDotted, 'M1 limit');
     if (s.zone) { pl(s.zone.hi, '#F5A524', L.Solid, `ext. ${acc ? 'demand' : 'supply'} (${s.zone.tf})`); pl(s.zone.lo, '#F5A524', L.Solid, ''); }
-    if (s.tap3_zone) { pl(s.tap3_zone.hi, '#4CC38A', L.Solid, `OB (${s.tap3_zone.tf})`); pl(s.tap3_zone.lo, '#4CC38A', L.Solid, ''); }
+    for (const z of (s.tap3_zones || [])) { pl(z.hi, '#4CC38A', L.Solid, `OB (${z.tf})`); pl(z.lo, '#4CC38A', L.Dotted, ''); }
     if (s.liquidity) pl(s.liquidity.level, '#B48CF2', L.Dashed, `ext. liquidity (${s.liquidity.tf})`);
     if (s.stop != null && s.state === 'confirmed') pl(s.stop, '#E06C6C', L.Dotted, 'stop');
     const times = new Set(s.candles.map((c) => c[0]));

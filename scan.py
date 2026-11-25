@@ -27,7 +27,7 @@ import numpy as np
 import pandas as pd
 
 from wyckoff_scanner.alerts import tradingview_url
-from wyckoff_scanner.confluence import zone_at_tap3
+from wyckoff_scanner.confluence import zones_at_tap3
 from wyckoff_scanner.timeframes import scan_frames
 
 ROOT = Path(__file__).resolve().parent
@@ -106,18 +106,17 @@ def signal_records(market: str, symbol: str, tv_symbol: str, frames: dict, range
                 zone = {"lo": rnd(r.demand_zone[0]), "hi": rnd(r.demand_zone[1]), "tf": r.demand_tf,
                         "ob": iso(r.demand_src["ob"]) if r.demand_src else None,
                         "fvg": iso(r.demand_src["fvg"]) if r.demand_src else None}
-            tap3_zone = None
+            tap3_zones = []
             if e.model == "model1" and r.tap2_idx is not None:
                 acc_ = r.side == "accumulation"
                 a, b = r.tap2_idx + 1, max(ext_i, r.tap2_idx + 1)
                 seg = df["high"].to_numpy()[a:b] if acc_ else -df["low"].to_numpy()[a:b]
                 hi_i = a + int(np.argmax(seg)) if len(seg) else a
                 tol = cfg["rules"].get("tap3_zone_tolerance", 0.05) * abs(r.reaction_price - r.climax_price)
-                z = zone_at_tap3(frames, r.side, idx[min(hi_i, len(idx) - 1)],
-                                 e.extreme if e.extreme is not None else e.price, tol)
-                if z is not None:
-                    tap3_zone = {"tf": z["tf"], "lo": rnd(z["lo"]), "hi": rnd(z["hi"]), "inside": z["inside"],
-                                 "distance": rnd(z["distance"]), "ob": iso(z["ob"]), "fvg": iso(z["fvg"])}
+                tap3_zones = [{"tf": z["tf"], "lo": rnd(z["lo"]), "hi": rnd(z["hi"]), "inside": z["inside"],
+                               "distance": rnd(z["distance"]), "ob": iso(z["ob"]), "fvg": iso(z["fvg"])}
+                              for z in zones_at_tap3(frames, r.side, idx[min(hi_i, len(idx) - 1)],
+                                                     e.extreme if e.extreme is not None else e.price, tol)]
             liq = None
             if r.liquidity_level is not None:
                 liq = {"level": rnd(r.liquidity_level), "tf": r.liquidity_tf,
@@ -158,7 +157,7 @@ def signal_records(market: str, symbol: str, tv_symbol: str, frames: dict, range
                           "model1_limit": rnd(r.model1_limit), "tap2": rnd(r.tap2_price),
                           "tap2_return": rnd(q) if r.tap2_return in ("either", "quarter") else None,
                           "tap2_closed_outside": r.tap2_closed_outside},
-                "zone": zone, "tap3_zone": tap3_zone, "liquidity": liq, "markers": markers, "timeline": timeline,
+                "zone": zone, "tap3_zones": tap3_zones, "liquidity": liq, "markers": markers, "timeline": timeline,
                 "candles": candles,
             })
     return out
@@ -277,10 +276,10 @@ def send_ntfy(topic: str, s: dict, what: str, tz: str, opener=None) -> None:
         lines.append(f"Level {s['level']:g}" + (f" ({s['level_tf']})" if s["level_tf"] else ""))
     if s["stop"] is not None:
         lines.append(f"Tap 3 extreme / stop {s['stop']:g}")
-    if s.get("tap3_zone"):
-        z = s["tap3_zone"]
+    if s.get("tap3_zones"):
         kind = "demand" if s["side"] == "accumulation" else "supply"
-        lines.append(f"+ Tap 3 {'in' if z['inside'] else 'near'} fresh {z['tf']} {kind} {z['lo']:g}-{z['hi']:g}")
+        lines.append(f"+ Tap 3 at fresh {kind}: " + ", ".join(
+            f"{z['tf']} {z['lo']:g}-{z['hi']:g}" + ("" if z["inside"] else " (near)") for z in s["tap3_zones"]))
     if s["flags"]:
         lines.append("Flags: " + ", ".join(s["flags"]))
     title = f"{s['symbol']} {s['tf']} - {what}"

@@ -51,6 +51,13 @@ def _zones(o, h, l, c, t, leg_start_ns: int):
 
 
 def zone_at_tap3(frames: dict, side: str, leg_start, extreme: float, tol: float) -> dict | None:
+    zs = zones_at_tap3(frames, side, leg_start, extreme, tol)
+    return zs[0] if zs else None
+
+
+def zones_at_tap3(frames: dict, side: str, leg_start, extreme: float, tol: float) -> list[dict]:
+    """The best matching zone on each timeframe, highest timeframe first."""
+    found = []
     mirror = side == "distribution"
     x = -extreme if mirror else extreme
     ls = int(pd.Timestamp(leg_start).value)
@@ -71,7 +78,7 @@ def zone_at_tap3(frames: dict, side: str, leg_start, extreme: float, tol: float)
         if best is not None:
             _, bot, top, ob, j = best
             lo, hi = (-top, -bot) if mirror else (bot, top)
-            return {"tf": tf, "lo": lo, "hi": hi, "distance": best[0][0],
-                    "inside": best[0][0] == 0.0,
-                    "ob": pd.Timestamp(t[ob], tz="UTC"), "fvg": pd.Timestamp(t[j], tz="UTC")}
-    return None
+            found.append({"tf": tf, "lo": lo, "hi": hi, "distance": best[0][0],
+                          "inside": best[0][0] == 0.0,
+                          "ob": pd.Timestamp(t[ob], tz="UTC"), "fvg": pd.Timestamp(t[j], tz="UTC")})
+    return found
