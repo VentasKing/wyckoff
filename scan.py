@@ -118,6 +118,8 @@ def signal_records(market: str, symbol: str, tv_symbol: str, frames: dict, range
             for ev in r.events:
                 if ev.kind == "tap2_start":
                     timeline.append({"time": iso(ev.time), "title": "Tap 2 · deviation", "detail": "Traded past the range"})
+                elif ev.kind == "tap2_extended":
+                    timeline.append({"time": iso(ev.time), "title": "Tap 2 extended", "detail": ev.note})
                 elif ev.kind == "tap2_complete":
                     timeline.append({"time": iso(ev.time), "title": "Tap 2 complete", "detail": f"Back in the range ({ev.note})"})
                 elif ev.kind == "tap3":
@@ -185,7 +187,8 @@ def scan_stocks(cfg) -> tuple[list[dict], dict]:
             ranges = scan_frames(frames, require_bos=rules["require_ar_break_of_structure"],
                                  allow_nested=rules["allow_nested_ranges"], tap2_return=rules["tap2_return"],
                                  trend_lookback=int(rules.get("trend_lookback", 50)),
-                                 opposite_max=int(rules.get("max_opposite_deviations", 1)))
+                                 opposite_max=int(rules.get("max_opposite_deviations", 1)),
+                                 tap3_spacing=float(rules.get("min_tap3_spacing", 0.25)))
             sigs += signal_records("stocks", u["symbol"], u["tv"], frames, ranges, cfg)
         except Exception as e:  # noqa: BLE001
             print(f"  {u['symbol']}: {e}")
@@ -217,7 +220,8 @@ def scan_crypto(cfg) -> tuple[list[dict], dict]:
             ranges = scan_frames(frames, require_bos=rules["require_ar_break_of_structure"],
                                  allow_nested=rules["allow_nested_ranges"], tap2_return=rules["tap2_return"],
                                  trend_lookback=int(rules.get("trend_lookback", 50)),
-                                 opposite_max=int(rules.get("max_opposite_deviations", 1)))
+                                 opposite_max=int(rules.get("max_opposite_deviations", 1)),
+                                 tap3_spacing=float(rules.get("min_tap3_spacing", 0.25)))
             sigs += signal_records("crypto", p["product_id"], coinbase_tv_symbol(p), frames, ranges, cfg)
         except Exception as e:  # noqa: BLE001
             print(f"  {p['product_id']}: {e}")

@@ -561,3 +561,16 @@ def test_distribution_mirror_uses_range_low_wording():
     p.leg(142, 4).leg(125, 4).leg(143, 4)
     r = only(detect_ranges(mirror_prices(p.df()), "4h"), side="distribution")
     assert r.status == "invalidated" and "range low" in r.invalid_reason
+
+
+def test_tap3_too_soon_after_tap2_extends_tap2():
+    """SAND case: a new low a few candles after tap 2 is tap 2 extending, not a tap 3."""
+    p = model1_live()
+    r0 = only(detect_ranges(p.df(), "1D"))
+    t2 = r0.tap2_idx
+    r = only(detect_ranges(p.df(), "1D", tap3_spacing=1.0))   # tap 3 would need tap1->tap2 candles
+    assert not [e for e in r.tap3_events() if e.model == "model1"]
+    assert r.tap2_idx > t2 and any(e.kind == "tap2_extended" for e in r.events)
+    assert r.status in ("tap2_active", "awaiting_tap3")
+    r = only(detect_ranges(p.df(), "1D", tap3_spacing=0.0))   # off: same as before
+    assert [e for e in r.tap3_events() if e.model == "model1"]

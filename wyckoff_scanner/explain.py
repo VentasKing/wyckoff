@@ -19,7 +19,8 @@ def explain(symbol: str, frames: dict, rules: dict, last: int = 12, out=print) -
                              allow_nested=rules.get("allow_nested_ranges", True),
                              tap2_return=rules.get("tap2_return", "either"),
                              trend_lookback=int(rules.get("trend_lookback", 50)),
-                             opposite_max=int(rules.get("max_opposite_deviations", 1)))
+                             opposite_max=int(rules.get("max_opposite_deviations", 1)),
+                             tap3_spacing=float(rules.get("min_tap3_spacing", 0.25)))
         trace = R.TRACE
     finally:
         R.TRACE = None

@@ -82,6 +82,7 @@ class Range:
     tap2_closed_outside: bool = False
     tap2_return: str = "either"      # how far price must come back to complete tap 2
     opposite_max: int = 1            # deviations of the opposite end allowed before tap 3
+    tap3_spacing: float = 0.0        # tap 2 -> tap 3 must take >= this fraction of tap 1 -> tap 2 (candles)
     liquidity_tf: str | None = None  # timeframe the extreme liquidity came from
     demand_tf: str | None = None     # timeframe the extreme demand/supply came from
     demand_src: dict | None = None   # {"ob": ns, "fvg": ns} candles the zone came from
@@ -116,7 +117,8 @@ class Range:
 def detect_ranges(df: pd.DataFrame, tf: str, ltf_swing_highs=None, ltf_swing_lows=None,
                   side: str = "both", require_color: bool = False, require_bos: bool = False,
                   allow_nested: bool = True, tap2_return: str = "either",
-                  ltf_frames=None, trend_lookback: int = 50, opposite_max: int = 1) -> list[Range]:
+                  ltf_frames=None, trend_lookback: int = 50, opposite_max: int = 1,
+                  tap3_spacing: float = 0.0) -> list[Range]:
     """Find every confirmed range on `df` and run its tap state machine to the
     last bar.  `ltf_swing_*` are lists of (time, price) from lower timeframes,
     used for the break-of-structure check.
@@ -130,13 +132,14 @@ def detect_ranges(df: pd.DataFrame, tf: str, ltf_swing_highs=None, ltf_swing_low
     if side in ("both", "accumulation"):
         ltf = [make_frame(t, d) for t, d in ltf_frames]
         out += _detect_accumulation(df, tf, ltf_swing_highs or [], require_color, "accumulation",
-                                    require_bos, tap2_return, ltf, trend_lookback, opposite_max)
+                                    require_bos, tap2_return, ltf, trend_lookback, opposite_max,
+                                    tap3_spacing)
     if side in ("both", "distribution"):
         m = mirror(df)
         lows_m = [(t, -p) for t, p in (ltf_swing_lows or [])]   # LTF lows become highs
         ltf_m = [make_frame(t, _mirror_cached(d)) for t, d in ltf_frames]
         rs = _detect_accumulation(m, tf, lows_m, require_color, "distribution", require_bos,
-                                  tap2_return, ltf_m, trend_lookback, opposite_max)
+                                  tap2_return, ltf_m, trend_lookback, opposite_max, tap3_spacing)
         out += [_unmirror(r) for r in rs]
     return _handle_nested(out, allow_nested)
 
@@ -209,7 +212,8 @@ TRACE: list | None = None     # set to a list to record why each candidate tap 1
 
 
 def _detect_accumulation(df, tf, ltf_highs, require_color, side_label, require_bos=False,
-                         tap2_return="either", ltf=None, trend_lookback=50, opposite_max=1):
+                         tap2_return="either", ltf=None, trend_lookback=50, opposite_max=1,
+                         tap3_spacing=0.0):
     o, h, l, c = (df[k].to_numpy(dtype=float) for k in ("open", "high", "low", "close"))
     arrs = (o, h, l, c)
     n = len(df)
@@ -313,6 +317,7 @@ def _detect_accumulation(df, tf, ltf_highs, require_color, side_label, require_b
                     k = deviation_k(tf)
                     size = h[run_hi] - sc.price
                     r = Range(side=side_label, tf=tf, tap2_return=tap2_return, opposite_max=opposite_max,
+                              tap3_spacing=tap3_spacing,
                               climax_idx=sc.idx, climax_price=sc.price,
                               reaction_idx=run_hi, reaction_price=h[run_hi], confirm_idx=i,
                               eq=eq, k=k, dev_limit=sc.price - k * size,
@@ -480,6 +485,23 @@ def _track_loop(r: Range, arrs, times, require_color, ltf):
 
         # ---- tap 3 ----------------------------------------------------------
         if r.status in ("awaiting_tap3", "tap3"):
+            # time spacing: tap 3 must come at least tap3_spacing x (tap 1 -> tap 2) candles
+            # after tap 2.  A new low before that is an extension of tap 2, not a tap 3.
+            min_gap = int(np.ceil(r.tap3_spacing * (r.tap2_idx - r.climax_idx)))
+            early = i - r.tap2_idx < min_gap
+            if early and l[i] < r.tap2_price:
+                r.tap2_idx, r.tap2_price = i, l[i]
+                r.status = "tap2_active"
+                ev("tap2_extended", None, i, l[i],
+                   f"new low {min_gap} candles were needed after tap 2 for a tap 3: tap 2 extended")
+                if c[i] < r.dev_limit:
+                    r.status, r.invalid_reason = "invalidated", "tap 2 closed beyond deviation limit"
+                    ev("invalidated", None, i, c[i], r.invalid_reason)
+                    break
+                if c[i] < sc:
+                    r.tap2_closed_outside = True
+                m2 = None
+                continue
             new_low_m1 = l[i] < r.tap2_price and "model1" not in tapped
 
             # update the taps already in play (before looking for new ones)
@@ -530,7 +552,7 @@ def _track_loop(r: Range, arrs, times, require_color, ltf):
                             e2.failed = True
                             e2.note += " | superseded: price went on to deviate tap 2 (model 1)"
                 liq_done = dz_done = True    # model 2 levels are retired once a model 1 starts
-            elif "model1" not in tapped and m2 is not None and i - 1 > r.tap2_idx:
+            elif "model1" not in tapped and m2 is not None and i - 1 > r.tap2_idx and not early:
                 # the high between tap 2 and tap 3 so far (candles before this one)
                 hi = r.tap2_idx + 1 + int(np.argmax(h[r.tap2_idx + 1: i]))
                 high_end = end_of(hi)

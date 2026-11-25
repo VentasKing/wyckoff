@@ -64,6 +64,7 @@ flood. From then on you get alerts for new ones.
 | `rules.tap2_return` | `"either"`, `"quarter"`, `"two_closes"`, `"close"` |
 | `rules.require_ar_break_of_structure` | `true` / `false` |
 | `rules.allow_nested_ranges` | `true` / `false` |
+| `rules.min_tap3_spacing` | tap 2 → tap 3 must take at least this fraction of the candles from tap 1 → tap 2 (default 0.25). A new low sooner than that counts as tap 2 extending; Model 2 hits sooner than that are ignored. 0 = off |
 | `rules.max_opposite_deviations` | how many separate deviations of the other end of the range are allowed before tap 3 (default 1 = red flag; one more ignores the setup; 0 = must stay fresh) |
 | `rules.trend_lookback` | tap 1 must close below (selling climax) or above (buying climax) every close of this many previous candles, so ranges follow the trend; `0` turns it off |
 | `alerts.tap3_potential`, `alerts.tap3_confirmed`, `alerts.model1_forming` | `true` / `false` |

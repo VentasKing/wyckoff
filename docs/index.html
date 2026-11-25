@@ -581,6 +581,7 @@ body.show-settings #dash{display:none}body.show-settings #settings{display:block
     const n = (v, lo, hi, name) => { if (!(Number.isInteger(v) && v >= lo && v <= hi)) errs.push(`${name} must be a whole number from ${lo} to ${hi}.`); };
     n(c.rules.trend_lookback ?? 50, 0, 500, 'Trend lookback');
     n(c.rules.max_opposite_deviations ?? 1, 0, 5, 'Deviations of the other end');
+    { const v = c.rules.min_tap3_spacing ?? 0.25; if (!(typeof v === 'number' && v >= 0 && v <= 2)) errs.push('Tap 3 spacing must be a number from 0 to 2.'); }
     n(c.alerts.max_bars_ago, 0, 100, 'Alert window');
     n(c.display.history_days, 1, 60, 'History days');
     n(c.display.max_live_bars ?? 30, 1, 1000, 'Live for (candles)');
@@ -650,10 +651,10 @@ body.show-settings #dash{display:none}body.show-settings #settings{display:block
     return `<div class="fld"><label for="${id}">${label}</label><select class="sel" id="${id}" data-sel="${path}">${all.map((o) =>
       `<option value="${esc(o)}"${o === v ? ' selected' : ''}>${esc(names ? names[o] || o : o)}</option>`).join('')}</select></div>`;
   }
-  function numf(path, label, help, dflt) {
+  function numf(path, label, help, dflt, step) {
     const id = 'f-' + path.replace(/\./g, '-');
     return `<div class="fld"><div class="row"><div><label for="${id}" style="font-size:13px;font-weight:600">${label}</label>${help ? `<div class="help">${help}</div>` : ''}</div>
-      <input id="${id}" class="inp num mono" type="number" min="0" step="1" data-num="${path}" value="${getp(draft, path) ?? dflt}"></div></div>`;
+      <input id="${id}" class="inp num mono" type="number" min="0" step="${step || 1}" data-num="${path}" value="${getp(draft, path) ?? dflt}"></div></div>`;
   }
   function listf(market, path, label, placeholder) {
     const xs = getp(draft, path) || [];
@@ -677,7 +678,7 @@ body.show-settings #dash{display:none}body.show-settings #settings{display:block
         <div class="muted" style="font-size:12px;margin-top:8px">My list · ${c.stocks.tickers.length} tickers</div>${tags(c.stocks.tickers)}</div>
       <div class="card"><h2>Crypto</h2>${kv('Scanning', c.crypto.enabled ? esc(c.crypto.universe) : 'Off')}${kv('Timeframes', esc(c.crypto.timeframes.join(' · ')))}
         <div class="muted" style="font-size:12px;margin-top:8px">My list · ${c.crypto.products.length} coins</div>${tags(c.crypto.products)}</div>
-      <div class="card"><h2>Model rules</h2>${kv('Tap 2 is complete when price…', esc(T2[c.rules.tap2_return] || c.rules.tap2_return))}${kv('Require the AR to break structure', yes(c.rules.require_ar_break_of_structure))}${kv('Allow ranges inside larger ranges', yes(c.rules.allow_nested_ranges))}${kv('Tap 1 must close beyond every close of the last', (c.rules.trend_lookback ?? 50) + ' candles')}${kv('Deviations of the other end allowed', c.rules.max_opposite_deviations ?? 1)}</div>
+      <div class="card"><h2>Model rules</h2>${kv('Tap 2 is complete when price…', esc(T2[c.rules.tap2_return] || c.rules.tap2_return))}${kv('Require the AR to break structure', yes(c.rules.require_ar_break_of_structure))}${kv('Allow ranges inside larger ranges', yes(c.rules.allow_nested_ranges))}${kv('Tap 1 must close beyond every close of the last', (c.rules.trend_lookback ?? 50) + ' candles')}${kv('Deviations of the other end allowed', c.rules.max_opposite_deviations ?? 1)}${kv('Tap 2 → tap 3 must take at least', Math.round((c.rules.min_tap3_spacing ?? 0.25) * 100) + '% of tap 1 → tap 2')}</div>
       <div class="card"><h2>Phone alerts</h2>${kv('Tap 3 potential', yes(c.alerts.tap3_potential))}${kv('Tap 3 confirmed', yes(c.alerts.tap3_confirmed))}${kv('Model 1 forming', yes(c.alerts.model1_forming))}${kv('Only taps from the last', c.alerts.max_bars_ago + ' bars')}${kv('Time zone', esc(c.display.timezone))}</div>`;
   }
 
@@ -697,6 +698,7 @@ body.show-settings #dash{display:none}body.show-settings #settings{display:block
     d.schedule = d.schedule || { automatic: true };
     d.rules.trend_lookback = d.rules.trend_lookback ?? 50;
     d.rules.max_opposite_deviations = d.rules.max_opposite_deviations ?? 1;
+    d.rules.min_tap3_spacing = d.rules.min_tap3_spacing ?? 0.25;
     g.innerHTML = `
       <div class="card" style="grid-column:1/-1"><h2>Scanning</h2>
         ${sw('schedule.automatic', 'Automatic scans every 30 minutes', 'Off: scans only run when you press Scan now (stocks on weekdays 9:00–17:00 New York, crypto around the clock)')}</div>
@@ -715,7 +717,8 @@ body.show-settings #dash{display:none}body.show-settings #settings{display:block
         ${sw('rules.require_ar_break_of_structure', 'Require the AR to break structure', 'Off: keep these ranges and flag them')}
         ${sw('rules.allow_nested_ranges', 'Allow ranges inside larger ranges', 'On: keep them and flag them')}
         ${numf('rules.trend_lookback', 'Trend lookback (candles)', 'Tap 1 must close beyond every close of this many candles. 0 turns it off.', 50)}
-        ${numf('rules.max_opposite_deviations', 'Deviations of the other end allowed', 'Before tap 3. One = red flag only; more ignores the setup. 0 = the other end must stay fresh.', 1)}</div>
+        ${numf('rules.max_opposite_deviations', 'Deviations of the other end allowed', 'Before tap 3. One = red flag only; more ignores the setup. 0 = the other end must stay fresh.', 1)}
+        ${numf('rules.min_tap3_spacing', 'Tap 3 spacing (fraction of tap 1 → tap 2)', 'Candles from tap 2 to tap 3 must be at least this share of the candles from tap 1 to tap 2. 0.25 = a quarter. A new low sooner than that extends tap 2. 0 = off.', 0.25, 0.05)}</div>
       <div class="card"><h2>Phone alerts</h2>
         ${sw('alerts.tap3_potential', 'Tap 3 potential', 'An extreme level or zone was hit')}
         ${sw('alerts.tap3_confirmed', 'Tap 3 confirmed', 'Structure broke after the tap')}
@@ -741,7 +744,7 @@ body.show-settings #dash{display:none}body.show-settings #settings{display:block
     const g = $('#cfggrid');
     g.querySelectorAll('[data-sw]').forEach((el) => el.onclick = () => { setp(draft, el.dataset.sw, !getp(draft, el.dataset.sw)); changed(); });
     g.querySelectorAll('[data-sel]').forEach((el) => el.onchange = () => { setp(draft, el.dataset.sel, el.value); changed(); });
-    g.querySelectorAll('[data-num]').forEach((el) => el.onchange = () => { setp(draft, el.dataset.num, parseInt(el.value, 10)); changed(); });
+    g.querySelectorAll('[data-num]').forEach((el) => el.onchange = () => { setp(draft, el.dataset.num, el.step === '1' ? parseInt(el.value, 10) : parseFloat(el.value)); changed(); });
     g.querySelectorAll('[data-tf]').forEach((el) => el.onclick = () => {
       const cur = new Set(getp(draft, el.dataset.tf)); cur.has(el.dataset.v) ? cur.delete(el.dataset.v) : cur.add(el.dataset.v);
       setp(draft, el.dataset.tf, TF_ORDER.filter((t) => cur.has(t))); changed(); });
