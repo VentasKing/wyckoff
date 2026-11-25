@@ -11,6 +11,7 @@
 "ABBV-4h-accumulation-2026-11-06T14-30-00Z-model2-demand|potential",
 "ADA-USD-15m-accumulation-2026-11-24T03-15-00Z-model1|forming",
 "ADA-USD-1h-distribution-2026-11-19T13-00-00Z-model2-liquidity|potential",
+"ADA-USD-30m-accumulation-2026-11-24T16-00-00Z-model1|forming",
 "ADA-USD-30m-accumulation-2026-11-24T16-00-00Z-model2-demand|potential",
 "ADBE-1D-distribution-2026-06-01T04-00-00Z-model1|confirmed",
 "AMAT-1D-accumulation-2026-11-05T05-00-00Z-model2-liquidity|potential",
@@ -46,6 +47,7 @@
 "BTC-USD-30m-accumulation-2026-11-24T03-00-00Z-model1|forming",
 "BTC-USD-30m-accumulation-2026-11-24T03-00-00Z-model2-demand|potential",
 "BTC-USD-30m-accumulation-2026-11-24T10-30-00Z-model1|confirmed",
+"BTC-USD-30m-accumulation-2026-11-24T17-00-00Z-model1|confirmed",
 "BTC-USD-30m-accumulation-2026-11-24T17-00-00Z-model1|forming",
 "BTC-USD-30m-accumulation-2026-11-24T17-00-00Z-model2-demand|potential",
 "CVX-1h-accumulation-2026-11-10T14-30-00Z-model1|confirmed",
@@ -55,6 +57,7 @@
 "DOGE-USD-15m-accumulation-2026-11-24T03-15-00Z-model1|confirmed",
 "DOGE-USD-15m-accumulation-2026-11-24T03-15-00Z-model2-demand|potential",
 "DOGE-USD-30m-accumulation-2026-11-24T16-00-00Z-model1|confirmed",
+"DOGE-USD-30m-accumulation-2026-11-25T04-00-00Z-model1|forming",
 "DOT-USD-15m-accumulation-2026-11-24T03-00-00Z-model1|forming",
 "ETC-USD-30m-accumulation-2026-11-24T16-30-00Z-model2-demand|potential",
 "ETH-USD-15m-accumulation-2026-11-24T03-00-00Z-model1|confirmed",
@@ -70,6 +73,7 @@
 "LINK-USD-15m-accumulation-2026-11-24T03-00-00Z-model1|forming",
 "LINK-USD-30m-accumulation-2026-11-24T16-00-00Z-model1|confirmed",
 "LINK-USD-30m-accumulation-2026-11-24T16-00-00Z-model2-demand|potential",
+"LINK-USD-30m-accumulation-2026-11-25T02-00-00Z-model1|forming",
 "LLY-1h-distribution-2026-11-05T14-30-00Z-model1|confirmed",
 "LMT-30m-distribution-2026-11-05T15-30-00Z-model1|confirmed",
 "LOW-4h-distribution-2026-11-05T14-30-00Z-model2-liquidity|potential",
@@ -124,5 +128,6 @@
 "XLM-USD-15m-accumulation-2026-11-24T03-00-00Z-model1|forming",
 "XLM-USD-30m-accumulation-2026-11-23T02-30-00Z-model1|forming",
 "XLM-USD-30m-accumulation-2026-11-24T17-00-00Z-model2-liquidity|confirmed",
+"XLM-USD-30m-accumulation-2026-11-24T17-00-00Z-model2-liquidity|potential",
 "XLY-1D-accumulation-2026-07-23T04-00-00Z-model2-liquidity|potential"
 ]
