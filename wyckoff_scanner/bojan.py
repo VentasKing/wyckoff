@@ -16,7 +16,8 @@ two below it):
 
   * tap 3 (spring / UTAD): the formation's lowest low is the tap 3 extreme, or
     within `tol` of it, and lands in or next to the tap 3 extreme candle.
-  * LPS / LPSY: after the tap 3 extreme, with its lowest low above that extreme.
+  * LPS / LPSY: after tap 3 is confirmed, with its lowest low above the tap 3
+    extreme.
 """
 from __future__ import annotations
 
@@ -65,12 +66,13 @@ def _arrays(df, mirror):
 
 
 def bojans_for_tap3(frames: dict, tf: str, side: str, ext_start, ext_end, extreme: float,
-                    tol: float, lps: bool = True, min_wick: float = 0.3, depth: int = 2) -> list[dict]:
+                    tol: float, lps_after=None, min_wick: float = 0.3, depth: int = 2) -> list[dict]:
     """Bojans at tap 3 and at the LPS/LPSY after it, on `tf` and up to `depth`
     timeframes below it."""
     mirror = side == "distribution"
     x = -extreme if mirror else extreme
     s_ns, e_ns = int(pd.Timestamp(ext_start).value), int(pd.Timestamp(ext_end).value)
+    lps_ns = None if lps_after is None else max(int(pd.Timestamp(lps_after).value), e_ns)
     span = max(e_ns - s_ns, 1)
     pos = TIMEFRAMES.index(tf) if tf in TIMEFRAMES else len(TIMEFRAMES)
     tfs = [t for t in TIMEFRAMES[max(0, pos - depth):pos + 1][::-1] if t in frames]
@@ -87,8 +89,8 @@ def bojans_for_tap3(frames: dict, tf: str, side: str, ext_start, ext_end, extrem
             # tap 3: lowest candle in or next to the tap 3 extreme candle, low at the extreme
             if at3 is None and s_ns - span <= ts[m] < e_ns + span and abs(low - x) <= tol:
                 at3 = (i, j, m)
-            # LPS / LPSY: starts after the tap 3 extreme candle, holds above the extreme
-            elif lps and ts[i] >= e_ns and low > x + tol:
+            # LPS / LPSY: after tap 3 was confirmed, holds above the tap 3 extreme
+            elif lps_ns is not None and ts[i] >= lps_ns and low > x + tol:
                 lps_hit = (i, j, m)            # keep the latest one
         for where, hit in (("tap3", at3), ("lps", lps_hit)):
             if hit is None:

@@ -649,8 +649,10 @@ def test_bojan_at_tap3_and_lps():
                                           (125, 126, 108, 121), (121, 123, 104, 122), (122, 124, 106, 123),
                                           (123, 130, 122, 129)]
     df = _bojan_df(rows)
-    got = bojans_for_tap3({"1h": df}, "1h", "accumulation", df.index[4], df.index[5], 94, tol=1)
+    got = bojans_for_tap3({"1h": df}, "1h", "accumulation", df.index[4], df.index[5], 94, tol=1,
+                          lps_after=df.index[6])
     assert [(b["where"], b["tf"], b["price"]) for b in got] == [("tap3", "1h", 94), ("lps", "1h", 104)]
     m = _bojan_df([(-o, -l, -h, -c) for o, h, l, c in rows])
-    got = bojans_for_tap3({"1h": m}, "1h", "distribution", m.index[4], m.index[5], -94, tol=1)
+    got = bojans_for_tap3({"1h": m}, "1h", "distribution", m.index[4], m.index[5], -94, tol=1,
+                          lps_after=m.index[6])
     assert [(b["where"], b["price"]) for b in got] == [("tap3", -94), ("lps", -104)]

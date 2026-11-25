@@ -58,6 +58,7 @@ class TapEvent:
     extreme: float | None = None      # tap 3: furthest price reached (the stop level)
     extreme_idx: int | None = None
     confirmed: bool = False           # tap 3: a later candle closed back past its level
+    confirmed_idx: int | None = None  # tap 3: candle that confirmed it
     failed: bool = False              # tap 3: extreme broken after confirmation / superseded
     level: float | None = None        # tap 3: close needed to confirm / level that was hit
     level_tf: str | None = None       # Model 2: timeframe of the level (structure checked there)
@@ -554,13 +555,13 @@ def _track_loop(r: Range, arrs, times, require_color, ltf):
                             if ext is not None:
                                 e.extreme = ext
                             if ok:
-                                e.confirmed = True
+                                e.confirmed, e.confirmed_idx = True, i
                     continue
                 if not e.confirmed:
                     if l[i] < e.extreme:
                         e.extreme, e.extreme_idx = float(l[i]), i
                     if c[i] > e.level and i > e.extreme_idx:
-                        e.confirmed = True
+                        e.confirmed, e.confirmed_idx = True, i
                 elif l[i] < e.extreme:
                     e.failed = True
                     e.note += " | stop hit: traded through the confirmed tap 3 extreme"
