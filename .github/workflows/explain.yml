@@ -1,4 +1,5 @@
 name: Explain a symbol
+run-name: Explain ${{ github.event.inputs.symbol }} ${{ github.event.inputs.timeframes }}
 
 # Prints, timeframe by timeframe, every candidate tap 1 and the rule that kept or
 # rejected it, plus what each range did. Doesn't scan, alert or save anything.
@@ -42,4 +43,6 @@ jobs:
           APCA_API_KEY_ID: ${{ secrets.APCA_API_KEY_ID }}
           APCA_API_SECRET_KEY: ${{ secrets.APCA_API_SECRET_KEY }}
           EXPLAIN_LAST: ${{ github.event.inputs.last }}
-        run: python scan.py --explain "${{ github.event.inputs.symbol }}" "${{ github.event.inputs.timeframes }}"
+        run: |
+          python scan.py --explain "${{ github.event.inputs.symbol }}" "${{ github.event.inputs.timeframes }}" | tee explain.txt
+          { echo '```'; cat explain.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
