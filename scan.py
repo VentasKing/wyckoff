@@ -312,7 +312,9 @@ def push_alerts(signals, cfg, topic, opener=None) -> int:
 def main(now: datetime | None = None, opener=None) -> dict:
     now = now or datetime.now(timezone.utc)
     cfg = json.loads((ROOT / "config.json").read_text())
-    forced = [m.strip() for m in os.environ.get("SCAN_MARKETS", "").split(",") if m.strip()]
+    forced = [m.strip().lower() for m in os.environ.get("SCAN_MARKETS", "").split(",") if m.strip()]
+    if "all" in forced:
+        forced = ["stocks", "crypto"]
     prev = json.loads(OUT.read_text()) if OUT.exists() else {"signals": [], "markets": {}}
     markets = dict(prev.get("markets", {}))
     signals = {"stocks": [s for s in prev.get("signals", []) if s["market"] == "stocks"],
