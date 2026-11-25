@@ -574,3 +574,22 @@ def test_tap3_too_soon_after_tap2_extends_tap2():
     assert r.status in ("tap2_active", "awaiting_tap3")
     r = only(detect_ranges(p.df(), "1D", tap3_spacing=0.0))   # off: same as before
     assert [e for e in r.tap3_events() if e.model == "model1"]
+
+
+def test_stopped_model1_rolls_into_a_new_model():
+    """BTC-USD 30m, Nov 24 2026: tap 3 (59,190) confirmed, then deviated. The old
+    tap 2 (59,300) becomes tap 1, 60,619 the AR, 59,190 tap 2, the new low tap 3."""
+    import json, pathlib
+    import pandas as pd
+    from wyckoff_scanner.timeframes import scan_frames
+    rows = json.loads((pathlib.Path(__file__).parent / "data" / "btc_30m_2026-11-24.json").read_text())
+    df = pd.DataFrame(rows, columns=["t", "open", "high", "low", "close"])
+    df.index = pd.to_datetime(df.pop("t"), unit="s", utc=True)
+    rs = scan_frames({"30m": df}, tap3_spacing=0.25, opposite_max=0)
+    old = next(r for r in rs if r.climax_price == pytest.approx(59366.13))
+    assert old.status == "invalidated"
+    new = next(r for r in rs if r.climax_price == pytest.approx(59300.01))
+    assert "rolled_from_earlier_model" in new.red_flags
+    assert new.reaction_price == pytest.approx(60619.38) and new.tap2_price == pytest.approx(59189.67)
+    m1 = [e for e in new.tap3_events() if e.model == "model1"]
+    assert m1 and not m1[0].failed and new.status == "tap3"

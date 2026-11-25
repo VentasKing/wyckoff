@@ -367,7 +367,7 @@ body.show-settings #dash{display:none}body.show-settings #settings{display:block
     if (!sel) { d.innerHTML = DATA.generated_at ? '<div class="card empty">Pick a setup to see its chart.</div>' : ''; return; }
     const s = sel, acc = s.side === 'accumulation', r = s.range;
     const flagText = { range_high_not_fresh: 'Range high already taken before tap 3', range_low_not_fresh: 'Range low already taken before tap 3',
-      ar_no_break_of_structure: 'AR did not break structure', inside_larger_range: 'Inside a larger range' };
+      ar_no_break_of_structure: 'AR did not break structure', inside_larger_range: 'Inside a larger range', rolled_from_earlier_model: 'Rolled from an earlier model (its tap 2 → tap 1 here)' };
     const statusNote = s.status === 'invalidated' ? `Invalidated: ${s.invalid_reason || ''}` : s.status === 'completed' ? 'Played out: broke the opposite end' :
       s.status === 'superseded' ? 'Replaced by a newer range' : '';
     const next = s.state === 'potential' ? `Wait for a break of structure${s.level_tf ? ' on the ' + s.level_tf : ''}` :

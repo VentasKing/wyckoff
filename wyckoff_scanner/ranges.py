@@ -328,6 +328,7 @@ def _detect_accumulation(df, tf, ltf_highs, require_color, side_label, require_b
                         r.red_flags.append("ar_no_break_of_structure")
                     _track(r, arrs, times, require_color, ltf=ltf)
                     ranges.append(r)
+                    ranges += _roll(r, arrs, times, require_color, ltf)
                 break
         if outcome is not None:
             note(sc, outcome)
@@ -362,6 +363,42 @@ def _track(r: Range, arrs, times, require_color, stop_at: int | None = None, ltf
 
 
 TRACK_FLAGS = ("range_high_not_fresh",)
+
+
+def _roll(r: Range, arrs, times, require_color, ltf=None) -> list[Range]:
+    """A confirmed Model 1 tap 3 that gets deviated starts a new model: the old
+    tap 2 becomes tap 1, the high between the old taps 2 and 3 is the AR, the old
+    tap 3 becomes tap 2 and the new deviation is the (potential) tap 3.  Repeats
+    while each new model is stopped out the same way."""
+    o, h, l, c = arrs
+    out = []
+    while (r.status == "invalidated" and r.invalid_reason == "traded through the confirmed tap 3 extreme"
+           and r.tap2_idx is not None):
+        m1 = next((e for e in r.tap3_events() if e.model == "model1" and e.confirmed), None)
+        if m1 is None:
+            break
+        a, t3 = r.tap2_idx, (m1.extreme_idx if m1.extreme_idx is not None else m1.idx)
+        if t3 - a < 2:
+            break
+        ar_i = a + 1 + int(np.argmax(h[a + 1:t3]))
+        sc, arp = float(r.tap2_price), float(h[ar_i])
+        size = arp - sc
+        if size <= 0:
+            break
+        eq = (sc + arp) / 2
+        conf = next((j for j in range(ar_i + 1, t3 + 1) if l[j] <= eq), None)
+        if conf is None:
+            break
+        n = Range(side=r.side, tf=r.tf, tap2_return=r.tap2_return, opposite_max=r.opposite_max,
+                  tap3_spacing=r.tap3_spacing, climax_idx=a, climax_price=sc,
+                  reaction_idx=ar_i, reaction_price=arp, confirm_idx=conf, eq=eq, k=r.k,
+                  dev_limit=sc - r.k * size, opposite_limit=arp + r.k * size)
+        n.times = {"climax": times[a], "reaction": times[ar_i], "confirmed": times[conf]}
+        n.red_flags.append("rolled_from_earlier_model")
+        _track(n, arrs, times, require_color, ltf=ltf)
+        out.append(n)
+        r = n
+    return out
 
 
 def _retrack(r: Range, arrs, times, require_color, stop_at, ltf=None):
