@@ -593,3 +593,27 @@ def test_stopped_model1_rolls_into_a_new_model():
     assert new.reaction_price == pytest.approx(60619.38) and new.tap2_price == pytest.approx(59189.67)
     m1 = [e for e in new.tap3_events() if e.model == "model1"]
     assert m1 and not m1[0].failed and new.status == "tap3"
+
+
+def test_tap3_into_fresh_order_block():
+    import pandas as pd
+    from wyckoff_scanner.confluence import zone_at_tap3
+    # bars: o, h, l, c
+    rows = [(110, 111, 108, 109), (109, 109.5, 100, 101),      # bearish OB 100-109.5
+            (101, 106, 101, 105), (105, 112, 104.9, 111),       # bullish move, FVG: low 110.? > OB high? no
+            (111, 118, 110, 117),                               # FVG: low 110 > high of bar 2 (106)
+            (117, 125, 116, 124), (124, 126, 118, 119),         # high before tap 3 = 126
+            (119, 120, 108, 109), (109, 110, 103.2, 108)]       # tap 3 extreme 103.2 in the OB
+    df = pd.DataFrame(rows, columns=["open", "high", "low", "close"],
+                      index=pd.date_range("2026-01-01", periods=len(rows), freq="30min", tz="UTC"))
+    z = zone_at_tap3({"30m": df}, "accumulation", df.index[6], 103.2, tol=1.0)
+    assert z and z["tf"] == "30m" and z["inside"] and (z["lo"], z["hi"]) == (100, 109.5)
+    # touched before the leg into tap 3 -> not fresh
+    rows2 = rows[:5] + [(117, 118, 109, 116)] + rows[5:]
+    df2 = pd.DataFrame(rows2, columns=df.columns,
+                       index=pd.date_range("2026-01-01", periods=len(rows2), freq="30min", tz="UTC"))
+    assert zone_at_tap3({"30m": df2}, "accumulation", df2.index[7], 103.2, tol=1.0) is None
+    # supply is the mirror
+    m = pd.DataFrame({"open": -df["open"], "high": -df["low"], "low": -df["high"], "close": -df["close"]})
+    zs = zone_at_tap3({"30m": m}, "distribution", m.index[6], -103.2, tol=1.0)
+    assert zs and (zs["lo"], zs["hi"]) == (-109.5, -100)
