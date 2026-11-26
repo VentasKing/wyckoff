@@ -11,6 +11,7 @@
 "AAVE-USD-30m-accumulation-2026-11-24T20-00-00Z-model2-liquidity|potential",
 "ABBV-4h-accumulation-2026-11-06T14-30-00Z-model2-demand|potential",
 "ADA-USD-15m-accumulation-2026-11-24T03-15-00Z-model1|forming",
+"ADA-USD-15m-distribution-2026-11-25T21-00-00Z-model1|forming",
 "ADA-USD-1h-distribution-2026-11-19T13-00-00Z-model2-liquidity|confirmed",
 "ADA-USD-1h-distribution-2026-11-19T13-00-00Z-model2-liquidity|potential",
 "ADA-USD-30m-accumulation-2026-11-24T16-00-00Z-model1|forming",
@@ -156,5 +157,6 @@
 "XLM-USD-30m-accumulation-2026-11-24T17-00-00Z-model1|forming",
 "XLM-USD-30m-accumulation-2026-11-24T17-00-00Z-model2-liquidity|confirmed",
 "XLM-USD-30m-accumulation-2026-11-24T17-00-00Z-model2-liquidity|potential",
-"XLY-1D-accumulation-2026-07-23T04-00-00Z-model2-liquidity|potential"
+"XLY-1D-accumulation-2026-07-23T04-00-00Z-model2-liquidity|potential",
+"XRP-USD-15m-distribution-2026-11-25T21-00-00Z-model1|forming"
 ]
