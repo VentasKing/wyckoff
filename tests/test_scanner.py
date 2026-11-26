@@ -644,15 +644,28 @@ def test_bojan_low_shapes_from_the_guide():
 
 def test_bojan_at_tap3_and_lps():
     from wyckoff_scanner.bojan import bojans_for_tap3
-    rows = [(130, 131, 125, 126)] * 3 + [(120, 121, 100, 111), (111, 115, 94, 112), (112, 117, 97, 113),
-                                          (113, 125, 112, 124), (124, 126, 118, 125),
-                                          (125, 126, 108, 121), (121, 123, 104, 122), (122, 124, 106, 123),
+    rows = [(130, 131, 125, 126)] * 3 + [(120, 121, 100, 111), (111, 115, 94, 112), (112, 121, 97, 120),
+                                          (120, 125, 119, 124), (124, 126, 118, 125),
+                                          (125, 126, 113, 121), (121, 123, 109, 122), (122, 124, 111, 123),
                                           (123, 130, 122, 129)]
     df = _bojan_df(rows)
     got = bojans_for_tap3({"1h": df}, "1h", "accumulation", df.index[4], df.index[5], 94, tol=1,
                           lps_after=df.index[6])
-    assert [(b["where"], b["tf"], b["price"]) for b in got] == [("tap3", "1h", 94), ("lps", "1h", 104)]
+    assert [(b["where"], b["tf"], b["price"]) for b in got] == [("tap3", "1h", 94), ("lps", "1h", 109)]
     m = _bojan_df([(-o, -l, -h, -c) for o, h, l, c in rows])
     got = bojans_for_tap3({"1h": m}, "1h", "distribution", m.index[4], m.index[5], -94, tol=1,
                           lps_after=m.index[6])
-    assert [(b["where"], b["price"]) for b in got] == [("tap3", -94), ("lps", -104)]
+    assert [(b["where"], b["price"]) for b in got] == [("tap3", -94), ("lps", -109)]
+
+
+def test_bojan_middle_wick_and_clusters():
+    from wyckoff_scanner.bojan import find_bojans
+    arr = lambda df: [df[k].to_numpy(float) for k in ("open", "high", "low", "close")]
+    # middle wick shorter than the first -> not a Bojan
+    df = _bojan_df([(120, 121, 100, 112), (112, 115, 97, 108), (108, 117, 94, 113)])
+    assert find_bojans(*arr(df)) == []
+    # PEPE-like: the same three candles inside a cluster of lows at that level -> not a Bojan
+    good = [(120, 121, 100, 109), (109, 114, 97, 112), (112, 118, 94, 113)]
+    flat = [(118, 119, 95, 117)] * 3
+    assert find_bojans(*arr(_bojan_df(flat + good + flat))) == []
+    assert find_bojans(*arr(_bojan_df([(130, 131, 125, 126)] * 3 + good + [(113, 125, 112, 124)] * 3))) == [(3, 5, 5)]

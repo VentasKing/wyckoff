@@ -1,15 +1,18 @@
 """Bojan lows / highs: a wick formation that allows an aggressive entry.
 
-Read from the guide (accumulation; distribution is the mirror, upper wicks):
+Read from the guide: a Bojan looks like a Wyckoff model on a lower timeframe,
+each wick end being a tap (accumulation; distribution is the mirror, upper wicks).
 
-  * 3 or 4 consecutive candles.
-  * Every candle has a real lower wick: at least `min_wick` of its range sits
-    below its body.
-  * A later candle's wick sweeps below an earlier candle's low (a new low made
-    by a wick), and the candle with the lowest low has a long wick: at least
-    half of its range below its body.
-  * No candle closes below the first candle's low: the sweeps are rejected and
-    the bodies hold above.
+  * 3 or 4 consecutive candles, each with at least `min_wick` of its range as a
+    lower wick; the deepest wick at least half its candle's range.
+  * Model 1 shape: each wick lower and longer than the one before, the last
+    one deepest.  Model 2 shape: lower and longer up to the deepest wick, then
+    one shorter wick that holds above it but still undercuts the first candle.
+    (3 candles: the middle wick is longer than the first and either the
+    deepest or shorter than the last.)
+  * No candle closes below the first candle's low.
+  * Not in a cluster: none of the 5 candles either side has a low within half
+    the deepest wick's length of it (above or below).
 
 Where it counts (any reasonable timeframe = the model's own timeframe and the
 two below it):
@@ -29,28 +32,52 @@ from .timeframes import TIMEFRAMES
 BIG = np.iinfo(np.int64).max
 
 
-def find_bojans(o, h, l, c, min_wick: float = 0.3, sizes=(4, 3)) -> list[tuple[int, int, int]]:
-    """(first, last, lowest) candle indexes of each Bojan low.  Overlapping
+def _shape_ok(l, w, i, j) -> int | None:
+    """The wick ends read like taps of a small Wyckoff model.  Returns the
+    deepest candle, or None.
+
+      * Model 1 shape: every wick lower and longer than the one before; the last
+        candle is the deepest (3 candles: tap 1, 2, 3).
+      * Model 2 shape: lower and longer up to the deepest wick, then one candle
+        whose wick is shorter and whose low stays above the deepest but still
+        below the first candle's low (the middle wick is the deepest of 3).
+    """
+    m = i + int(np.argmin(l[i:j + 1]))
+    if m == i or j - m > 1:
+        return None
+    for k in range(i + 1, m + 1):                 # lower and longer up to the deepest
+        if not (l[k] < l[k - 1] and w[k] > w[k - 1]):
+            return None
+    if m < j and not (l[m] < l[j] < l[i] and w[j] < w[m]):
+        return None
+    return m
+
+
+def find_bojans(o, h, l, c, min_wick: float = 0.3, sizes=(4, 3), isolation: int = 5) -> list[tuple[int, int, int]]:
+    """(first, last, deepest) candle indexes of each Bojan low.  Overlapping
     windows are merged into the longest one."""
     n = len(c)
     rng = h - l
     body_lo = np.minimum(o, c)
-    wick = np.where(rng > 0, (body_lo - l) / np.where(rng > 0, rng, 1), 0.0)
-    good = wick >= min_wick
+    w = body_lo - l                                         # lower wick length
+    share = np.where(rng > 0, w / np.where(rng > 0, rng, 1), 0.0)
+    good = share >= min_wick
     out, used_to = [], -1
     for i in range(n):
         for k in sizes:
             j = i + k - 1
-            if j >= n or i <= used_to and j <= used_to:
+            if j >= n or (i <= used_to and j <= used_to):
                 continue
             if not good[i:j + 1].all():
                 continue
-            m = i + int(np.argmin(l[i:j + 1]))
-            if m == i or l[m] >= l[i]:
-                continue
-            if wick[m] < 0.5:
+            m = _shape_ok(l, w, i, j)
+            if m is None or share[m] < 0.5:
                 continue
             if (c[i:j + 1] < l[i]).any():
+                continue
+            # not inside a cluster: the deepest wick sticks out from the candles around it
+            near = np.r_[l[max(0, i - isolation):i], l[j + 1:j + 1 + isolation]]
+            if len(near) and (np.abs(near - l[m]) < 0.5 * w[m]).any():
                 continue
             out.append((i, j, m))
             used_to = max(used_to, j)
