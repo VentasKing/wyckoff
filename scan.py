@@ -128,7 +128,7 @@ def signal_records(market: str, symbol: str, tv_symbol: str, frames: dict, range
                                                e.extreme if e.extreme is not None else e.price, btol,
                                                lps_after=(idx[min(e.confirmed_idx, len(idx) - 1)]
                                                           if e.confirmed and not e.failed and e.confirmed_idx is not None else None),
-                                               min_wick=rules_.get("bojan_min_wick", 0.3),
+                                               min_wick=rules_.get("bojan_min_wick", 0.4),
                                                depth=int(rules_.get("bojan_timeframes_below", 2)))]
             for b in bojans:
                 if b["tf"] == r.tf:

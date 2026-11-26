@@ -53,7 +53,7 @@ def _shape_ok(l, w, i, j) -> int | None:
     return m
 
 
-def find_bojans(o, h, l, c, min_wick: float = 0.3, sizes=(4, 3), isolation: int = 5) -> list[tuple[int, int, int]]:
+def find_bojans(o, h, l, c, min_wick: float = 0.4, sizes=(4, 3), isolation: int = 5) -> list[tuple[int, int, int]]:
     """(first, last, deepest) candle indexes of each Bojan low.  Overlapping
     windows are merged into the longest one."""
     n = len(c)
@@ -93,7 +93,7 @@ def _arrays(df, mirror):
 
 
 def bojans_for_tap3(frames: dict, tf: str, side: str, ext_start, ext_end, extreme: float,
-                    tol: float, lps_after=None, min_wick: float = 0.3, depth: int = 2) -> list[dict]:
+                    tol: float, lps_after=None, min_wick: float = 0.4, depth: int = 2) -> list[dict]:
     """Bojans at tap 3 and at the LPS/LPSY after it, on `tf` and up to `depth`
     timeframes below it."""
     mirror = side == "distribution"

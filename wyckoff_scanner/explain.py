@@ -59,7 +59,7 @@ def _bojans(r, df, frames, rules, out):
         lps = idx[min(e.confirmed_idx, len(idx) - 1)] if e.confirmed and not e.failed and e.confirmed_idx is not None else None
         tol = rules.get("tap3_zone_tolerance", 0.05) * abs(r.reaction_price - r.climax_price)
         for b in bojans_for_tap3(frames, r.tf, r.side, idx[ei], end, e.extreme if e.extreme is not None else e.price,
-                                 tol, lps_after=lps, min_wick=rules.get("bojan_min_wick", 0.3),
+                                 tol, lps_after=lps, min_wick=rules.get("bojan_min_wick", 0.4),
                                  depth=int(rules.get("bojan_timeframes_below", 2))):
             out(f"        ◉ Bojan at {b['where']} on {b['tf']} ({e.model}): {b['candles']} candles")
             f = frames[b["tf"]]

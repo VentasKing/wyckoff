@@ -596,7 +596,7 @@ body.show-settings #dash{display:none}body.show-settings #settings{display:block
     const n = (v, lo, hi, name) => { if (!(Number.isInteger(v) && v >= lo && v <= hi)) errs.push(`${name} must be a whole number from ${lo} to ${hi}.`); };
     n(c.rules.trend_lookback ?? 50, 0, 500, 'Trend lookback');
     n(c.rules.max_opposite_deviations ?? 1, 0, 5, 'Deviations of the other end');
-    { const v = c.rules.bojan_min_wick ?? 0.3; if (!(typeof v === 'number' && v > 0 && v < 1)) errs.push('Bojan wick share must be between 0 and 1.'); }
+    { const v = c.rules.bojan_min_wick ?? 0.4; if (!(typeof v === 'number' && v > 0 && v < 1)) errs.push('Bojan wick share must be between 0 and 1.'); }
     n(c.rules.bojan_timeframes_below ?? 2, 0, 6, 'Bojan timeframes below');
     { const v = c.rules.tap3_zone_tolerance ?? 0.05; if (!(typeof v === 'number' && v >= 0 && v <= 1)) errs.push('Order block tolerance must be a number from 0 to 1.'); }
     { const v = c.rules.min_tap3_spacing ?? 0.25; if (!(typeof v === 'number' && v >= 0 && v <= 2)) errs.push('Tap 3 spacing must be a number from 0 to 2.'); }
@@ -718,7 +718,7 @@ body.show-settings #dash{display:none}body.show-settings #settings{display:block
     d.rules.max_opposite_deviations = d.rules.max_opposite_deviations ?? 1;
     d.rules.min_tap3_spacing = d.rules.min_tap3_spacing ?? 0.25;
     d.rules.tap3_zone_tolerance = d.rules.tap3_zone_tolerance ?? 0.05;
-    d.rules.bojan_min_wick = d.rules.bojan_min_wick ?? 0.3;
+    d.rules.bojan_min_wick = d.rules.bojan_min_wick ?? 0.4;
     d.rules.bojan_timeframes_below = d.rules.bojan_timeframes_below ?? 2;
     g.innerHTML = `
       <div class="card" style="grid-column:1/-1"><h2>Scanning</h2>
@@ -741,7 +741,7 @@ body.show-settings #dash{display:none}body.show-settings #settings{display:block
         ${numf('rules.max_opposite_deviations', 'Deviations of the other end allowed', 'Before tap 3. One = red flag only; more ignores the setup. 0 = the other end must stay fresh.', 1)}
         ${numf('rules.min_tap3_spacing', 'Tap 3 spacing (fraction of tap 1 → tap 2)', 'Candles from tap 2 to tap 3 must be at least this share of the candles from tap 1 to tap 2. 0.25 = a quarter. A new low sooner than that extends tap 2. 0 = off.', 0.25, 0.05)}
         ${numf('rules.tap3_zone_tolerance', 'Order block at tap 3: how close counts (fraction of the range)', 'A Model 1 tap 3 gets the ◆ badge when its extreme is inside a fresh order block from any timeframe, or within this share of the range of one. 0.05 = 5%.', 0.05, 0.01)}
-        ${numf('rules.bojan_min_wick', 'Bojan: wick share of each candle', 'Every candle in a Bojan needs at least this share of its range as a wick on the spring/LPS side (the candle with the extreme wick needs half). 0.3 = 30%.', 0.3, 0.05)}
+        ${numf('rules.bojan_min_wick', 'Bojan: wick share of each candle', 'Every candle in a Bojan needs at least this share of its range as a wick on the spring/LPS side (the candle with the extreme wick needs half). 0.4 = 40%.', 0.4, 0.05)}
         ${numf('rules.bojan_timeframes_below', 'Bojan: timeframes below the model to check', 'The model’s own timeframe plus this many below it. 2 on a weekly model = weekly, daily and 4h.', 2)}</div>
       <div class="card"><h2>Phone alerts</h2>
         ${sw('alerts.tap3_potential', 'Tap 3 potential', 'An extreme level or zone was hit')}
