@@ -157,6 +157,7 @@
 "SLB-1W-distribution-2026-05-25T00-00-00Z-model2-liquidity|confirmed",
 "SNOW-1D-accumulation-2026-11-06T05-00-00Z-model1|confirmed",
 "SOL-USD-15m-accumulation-2026-11-24T03-00-00Z-model1|confirmed",
+"SOL-USD-15m-distribution-2026-11-26T14-00-00Z-model1|confirmed",
 "SOL-USD-15m-distribution-2026-11-26T14-00-00Z-model1|forming",
 "SOL-USD-1h-distribution-2026-11-17T23-00-00Z-model2-liquidity|potential",
 "SOL-USD-30m-accumulation-2026-11-23T12-30-00Z-model1|confirmed",
@@ -181,5 +182,6 @@
 "XLM-USD-30m-accumulation-2026-11-24T17-00-00Z-model2-liquidity|confirmed",
 "XLM-USD-30m-accumulation-2026-11-24T17-00-00Z-model2-liquidity|potential",
 "XLY-1D-accumulation-2026-07-23T04-00-00Z-model2-liquidity|potential",
-"XRP-USD-15m-distribution-2026-11-25T21-00-00Z-model1|forming"
+"XRP-USD-15m-distribution-2026-11-25T21-00-00Z-model1|forming",
+"ZEC-USD-1h-accumulation-2026-11-25T14-00-00Z-model2-demand|potential"
 ]
