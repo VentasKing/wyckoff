@@ -249,6 +249,7 @@
 "zone|ABNB|supply|1W|2022-02-14T00:00:00Z|hit",
 "zone|ABNB|supply|1W|2026-08-24T00:00:00Z|hit",
 "zone|ABNB|supply|2W|2026-08-17T00:00:00Z|hit",
+"zone|ABNB|supply|8h|2026-11-18T14:30:00Z|hit",
 "zone|ADA-USD|demand|2D|2026-06-24T00:00:00Z|hit",
 "zone|ADA-USD|demand|2D|2026-06-28T00:00:00Z|hit",
 "zone|ADA-USD|demand|3D|2026-06-27T00:00:00Z|hit",
