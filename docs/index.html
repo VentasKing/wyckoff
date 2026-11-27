@@ -127,6 +127,14 @@ body.show-settings #dash{display:none}body.show-settings #settings{display:block
 .tabs button:hover{color:var(--text)}
 .tabs button[aria-selected=true]{background:#1E2733;color:var(--text);box-shadow:inset 0 0 0 1px #2B3542}
 #zonesview{display:none}
+#zchart{position:relative}
+.zov{position:absolute;left:0;top:0;pointer-events:none;overflow:hidden;z-index:3}
+.zbox{position:absolute;box-sizing:border-box;background:rgba(76,195,138,.17);border:1px solid rgba(76,195,138,.5);border-right:0}
+.zov.sup .zbox{background:rgba(240,108,108,.17);border-color:rgba(240,108,108,.5)}
+.zbox.span{background:rgba(76,195,138,.05);border-style:dashed}
+.zov.sup .zbox.span{background:rgba(240,108,108,.05)}
+.zbox span{position:absolute;left:6px;top:2px;font-size:10px;font-weight:600;color:#CFF0DA;white-space:nowrap;text-shadow:0 1px 2px #000}
+.zov.sup .zbox span{color:#FFD9D0}
 body.show-zones #dash{display:none}body.show-zones #zonesview{display:block}
 body.show-settings #zonesview{display:none}
 .sp-dem{color:#4CC38A;border-color:#24503A}.sp-sup{color:#F08C6C;border-color:#5C3324}
@@ -643,8 +651,8 @@ body.show-settings #zonesview{display:none}
         <div class="fgroup" id="zctf" style="margin-top:12px"><span>Chart</span></div>
         <div id="zchart" role="img" aria-label="Chart of ${esc(g.symbol)} with the ${dem ? 'demand' : 'supply'} zones marked"></div>
         <div class="legend">
-          <span><span style="width:16px;height:2px;background:${dem ? '#4CC38A' : '#F08C6C'}"></span>Zone on this timeframe</span>
-          <span><span style="width:16px;border-top:2px dashed ${dem ? '#4CC38A' : '#F08C6C'}"></span>Whole group (all timeframes)</span>
+          <span><span style="width:16px;height:10px;background:${dem ? 'rgba(76,195,138,.35)' : 'rgba(240,108,108,.35)'};border:1px solid ${dem ? '#4CC38A' : '#F08C6C'}"></span>Zone on this timeframe</span>
+          <span><span style="width:16px;height:10px;border:1px dashed ${dem ? '#4CC38A' : '#F08C6C'}"></span>Whole group (all timeframes)</span>
           ${g.bojans.length ? '<span><span style="width:8px;height:8px;border-radius:50%;background:#E879C0"></span>Bojan on this timeframe</span>' : ''}
           <span class="muted">Times in ${esc(tz())}</span>
         </div>
@@ -683,6 +691,7 @@ body.show-settings #zonesview{display:none}
   async function drawZoneChart(g) {
     const el = $('#zchart');
     if (zchart) { zchart.remove(); zchart = null; }
+    el.querySelectorAll('.zov').forEach((x) => x.remove());
     if (!window.LightweightCharts) { el.innerHTML = '<div class="empty">The chart library didn’t load. Check your connection and refresh.</div>'; return; }
     let data = zcandles[g.chart || g.id];
     if (!data) {
@@ -716,15 +725,32 @@ body.show-settings #zonesview{display:none}
     const rows = data[zchartTf];
     ser.setData(rows.map(([t, o, h, l, c]) => ({ time: t, open: o, high: h, low: l, close: c })));
     const dem = g.side === 'demand', col = dem ? '#4CC38A' : '#F08C6C', L = LC.LineStyle;
+    // zones as transparent boxes from the OB / leg to the right edge, like TradingView rectangles
     const mine = g.zones.filter((z) => z.tf === zchartTf);
-    for (const z of mine) {
-      ser.createPriceLine({ price: z.hi, color: col, lineWidth: 2, lineStyle: L.Solid, axisLabelVisible: true, title: z.tf });
-      ser.createPriceLine({ price: z.lo, color: col, lineWidth: 2, lineStyle: L.Solid, axisLabelVisible: true, title: '' });
-    }
-    if (!mine.length || g.zones.length > mine.length) {      // the whole group's span
-      ser.createPriceLine({ price: g.hi, color: col, lineWidth: 1, lineStyle: L.Dashed, axisLabelVisible: !mine.length, title: mine.length ? '' : 'group' });
-      ser.createPriceLine({ price: g.lo, color: col, lineWidth: 1, lineStyle: L.Dashed, axisLabelVisible: !mine.length, title: '' });
-    }
+    const tsec = (iso) => Math.floor(new Date(iso) / 1000);
+    const boxes = mine.map((z) => ({ t: tsec(z.start), lo: z.lo, hi: z.hi, cls: '', label: `${z.tf} ${z.kind === 'structure' ? 'structure ' + (dem ? 'demand' : 'supply') : 'OB'}` }));
+    if (g.zones.length > mine.length && !mine.some((z) => z.lo === g.lo && z.hi === g.hi))
+      boxes.unshift({ t: Math.min(...g.zones.map((z) => tsec(z.start))), lo: g.lo, hi: g.hi, cls: ' span', label: mine.length ? '' : 'zone group (' + g.tfs.join(' · ') + ')' });
+    const ov = document.createElement('div'); ov.className = 'zov' + (dem ? '' : ' sup'); el.appendChild(ov);
+    const first = rows[0][0], me = zchart;
+    let lastHtml = '';
+    const place = () => {
+      if (zchart !== me) return;
+      const ts = me.timeScale(), w = ts.width(), bs = (ts.options().barSpacing || 6);
+      ov.style.width = w + 'px'; ov.style.height = Math.max(0, el.clientHeight - ts.height()) + 'px';
+      let html = '';
+      for (const bx of boxes) {
+        let x = ts.timeToCoordinate(bx.t);
+        if (x == null) { if (bx.t < first) x = -bs; else continue; }
+        x = Math.max(-2, x - bs / 2);
+        const y1 = ser.priceToCoordinate(bx.hi), y2 = ser.priceToCoordinate(bx.lo);
+        if (y1 == null || y2 == null) continue;
+        const top = Math.min(y1, y2), hgt = Math.max(2, Math.abs(y2 - y1));
+        html += `<div class="zbox${bx.cls}" style="left:${x.toFixed(1)}px;top:${top.toFixed(1)}px;width:${Math.max(0, w - x).toFixed(1)}px;height:${hgt.toFixed(1)}px">${bx.label ? `<span>${esc(bx.label)}</span>` : ''}</div>`;
+      }
+      if (html !== lastHtml) { ov.innerHTML = html; lastHtml = html; }
+      requestAnimationFrame(place);
+    };
     const times = new Set(rows.map((r) => r[0]));
     const marks = [];
     for (const z of g.zones.filter((z) => z.tf === zchartTf)) {
@@ -738,7 +764,11 @@ body.show-settings #zonesview{display:none}
       if (times.has(t)) marks.push({ time: t, position: dem ? 'belowBar' : 'aboveBar', color: '#E879C0', shape: 'circle', text: b.state === 'formed' ? 'Bojan' : 'forming' });
     }
     ser.setMarkers(marks.sort((a, b) => a.time - b.time));
-    zchart.timeScale().fitContent();
+    const n = rows.length, ts = zchart.timeScale();
+    const zi = Math.min(...boxes.map((bx) => { const i = rows.findIndex((r) => r[0] >= bx.t); return i < 0 ? n : i; }), n);
+    if (ts.setVisibleLogicalRange && n > 80) ts.setVisibleLogicalRange({ from: Math.max(0, Math.min(n - 70, zi - 12)), to: n + 4 });
+    else ts.fitContent();
+    requestAnimationFrame(place);
   }
 
   function setTab(t) {
