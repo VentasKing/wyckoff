@@ -18,6 +18,7 @@ import re
 import sys
 import time
 import traceback
+import urllib.parse
 import urllib.request
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -180,6 +181,100 @@ def signal_records(market: str, symbol: str, tv_symbol: str, frames: dict, range
     return out
 
 
+# ----------------------------------------------------------------- zones ---
+
+
+def zone_cfg(cfg) -> dict:
+    z = dict(cfg.get("zones") or {})
+    from wyckoff_scanner.zones import CRYPTO_ZONE_TFS, STOCK_ZONE_TFS
+    z.setdefault("enabled", True)
+    z.setdefault("crypto_timeframes", CRYPTO_ZONE_TFS)
+    z.setdefault("stock_timeframes", STOCK_ZONE_TFS)
+    z.setdefault("keep_candles", 6)
+    return z
+
+
+def tv_link(tv_symbol: str, tf: str) -> str:
+    from wyckoff_scanner.zones import TV_INTERVAL
+    return f"https://www.tradingview.com/chart/?symbol={urllib.parse.quote(tv_symbol)}&interval={TV_INTERVAL.get(tf, 'D')}"
+
+
+def zone_records(market: str, symbol: str, tv_symbol: str, frames: dict, cfg) -> tuple[list[dict], dict]:
+    """Zone groups for one symbol, plus the candles each group's chart needs."""
+    from wyckoff_scanner.zones import group_zones, scan_zones, tf_rank
+    zc = zone_cfg(cfg)
+    tfs = [t for t in (zc["crypto_timeframes"] if market == "crypto" else zc["stock_timeframes"]) if t in frames]
+    tfs.sort(key=tf_rank)
+    zones = scan_zones(frames, tfs, keep=int(zc["keep_candles"]),
+                       min_wick=cfg["rules"].get("bojan_min_wick", 0.4))
+    recs, candles = [], {}
+    low_tf = tfs[0] if tfs else None
+    last = frames[low_tf].iloc[-1] if low_tf else None
+    for g in group_zones(zones):
+        top = g[0]
+        tix = pd.DatetimeIndex(frames[top.tf].index)
+        gid = re.sub(r"[^A-Za-z0-9_-]", "-", f"{symbol}-{top.side}-{top.tf}-{iso(tix[top.first])}")
+        lo, hi = min(z.lo for z in g), max(z.hi for z in g)
+        zs, bojans = [], []
+        for z in g:
+            t = pd.DatetimeIndex(frames[z.tf].index)
+            zs.append({"tf": z.tf, "kind": z.kind, "lo": rnd(z.lo), "hi": rnd(z.hi),
+                       "start": iso(t[z.first]), "end": iso(t[z.last]), "fvg": iso(t[z.fvg]),
+                       "touch": iso(t[z.touch]), "touch_bars_ago": int(len(t) - 1 - z.touch),
+                       "tv": tv_link(tv_symbol, z.tf)})
+            for b in z.bojans:
+                bojans.append({"zone_tf": z.tf, "tf": b["tf"], "state": b["state"], "start": iso(b["start"]),
+                               "end": iso(b["end"]), "time": iso(b["time"]), "price": rnd(b["price"]),
+                               "candles": b["candles"], "tv": tv_link(tv_symbol, b["tf"])})
+        # one Bojan per (tf, start): keep it under its highest zone
+        seen, uniq = set(), []
+        for b in bojans:
+            k = (b["tf"], b["start"])
+            if k not in seen:
+                seen.add(k)
+                uniq.append(b)
+        in_zone = last is not None and float(last["low"]) <= hi and float(last["high"]) >= lo
+        recs.append({"id": gid, "market": market, "symbol": symbol, "side": top.side,
+                     "tfs": [z.tf for z in g], "lo": rnd(lo), "hi": rnd(hi),
+                     "price": rnd(float(last["close"])) if last is not None else None,
+                     "state": "in zone" if in_zone else "touched",
+                     "touch": max(z["touch"] for z in zs), "zones": zs, "bojans": uniq,
+                     "tv": tv_link(tv_symbol, top.tf)})
+        chart_tfs = sorted({z.tf for z in g} | {b["tf"] for b in uniq}, key=tf_rank, reverse=True)
+        candles[gid] = {tf: [[int(ts.value // 10**9), rnd(r.open), rnd(r.high), rnd(r.low), rnd(r.close)]
+                             for ts, r in frames[tf].iloc[-150:].iterrows()] for tf in chart_tfs}
+    return recs, candles
+
+
+def crypto_zone_frames(natives: dict, tfs: list[str]) -> dict:
+    from wyckoff_scanner.zones import resample_clock
+    out = {}
+    for tf in tfs:
+        src = natives.get("1h") if tf.endswith("h") else natives.get("1D")
+        if src is None or src.empty:
+            continue
+        out[tf] = src if tf == "1D" else resample_clock(src, tf)
+    return out
+
+
+def stock_zone_frames(cache, symbol: str, tfs: list[str]) -> dict:
+    from wyckoff_scanner.session import session_resample
+    from wyckoff_scanner.zones import resample_clock
+    out = {}
+    d = cache.load(symbol, "1Day")
+    m30 = cache.load(symbol, "30Min")
+    for tf in tfs:
+        if tf == "1D" and d is not None:
+            out[tf] = d
+        elif tf.endswith("W") and d is not None:
+            out[tf] = resample_clock(d, tf)
+        elif tf.endswith("h") and m30 is not None:
+            out[tf] = session_resample(m30, int(tf[:-1]) * 60)
+        elif tf.endswith("D") and d is not None:
+            out[tf] = resample_clock(d, tf)
+    return out
+
+
 # --------------------------------------------------------------- markets ---
 def scan_stocks(cfg) -> tuple[list[dict], dict]:
     from wyckoff_scanner.alpaca import TF_SOURCE, AlpacaClient, BarCache, stock_frames, update_cache
@@ -205,11 +300,23 @@ def scan_stocks(cfg) -> tuple[list[dict], dict]:
         missing = []
     cache = BarCache(str(ROOT / ".bar_cache"))
     syms = [u["symbol"] for u in universe]
-    for src in sorted({TF_SOURCE[t] for t in sc["timeframes"]}):
+    zc = zone_cfg(cfg)
+    srcs = {TF_SOURCE[t] for t in sc["timeframes"]}
+    if zc["enabled"]:
+        srcs |= {"1Day"} | ({"30Min"} if any(t.endswith("h") for t in zc["stock_timeframes"]) else set())
+    for src in sorted(srcs):
         print(f"  downloading {src} for {len(syms)} stocks")
         update_cache(client, cache, syms, src)
-    sigs = []
+    sigs, zrecs, zcandles = [], [], {}
     for u in universe:
+        if zc["enabled"]:
+            try:
+                r_, c_ = zone_records("stocks", u["symbol"], u["tv"],
+                                      stock_zone_frames(cache, u["symbol"], zc["stock_timeframes"]), cfg)
+                zrecs += r_
+                zcandles.update(c_)
+            except Exception as e:  # noqa: BLE001
+                print(f"  zones {u['symbol']}: {e}")
         try:
             frames = stock_frames(cache, u["symbol"], sc["timeframes"])
             if not frames:
@@ -222,7 +329,7 @@ def scan_stocks(cfg) -> tuple[list[dict], dict]:
             sigs += signal_records("stocks", u["symbol"], u["tv"], frames, ranges, cfg)
         except Exception as e:  # noqa: BLE001
             print(f"  {u['symbol']}: {e}")
-    return sigs, {"symbols": len(syms), "missing": missing}
+    return sigs, {"symbols": len(syms), "missing": missing, "zones": zrecs, "zone_candles": zcandles}
 
 
 def scan_crypto(cfg) -> tuple[list[dict], dict]:
@@ -241,10 +348,32 @@ def scan_crypto(cfg) -> tuple[list[dict], dict]:
         missing = []
         n = None if uni == "all USD pairs" else int(uni.split()[1])
         prods = coinbase_top_products(n, products=allp)
-    sigs = []
+    from wyckoff_scanner import data as D
+    zc = zone_cfg(cfg)
+    zh = any(t.endswith("h") for t in zc["crypto_timeframes"])
+    sigs, zrecs, zcandles = [], [], {}
     for p in prods:
+        pid = p["product_id"]
+        natives: dict = {}
+
+        def fetch(product_id, src, bars, _n=natives):
+            have = _n.get(src)
+            if have is None or len(have) < bars:
+                _n[src] = D._coinbase_native(product_id, src, bars)
+            return _n[src].iloc[-bars:]
+        if zc["enabled"]:
+            try:
+                if zh:
+                    fetch(pid, "1h", int(zc.get("crypto_hourly_bars", 3000)))
+                fetch(pid, "1D", int(zc.get("crypto_daily_bars", 3200)))
+                r_, c_ = zone_records("crypto", pid, coinbase_tv_symbol(p),
+                                      crypto_zone_frames(natives, zc["crypto_timeframes"]), cfg)
+                zrecs += r_
+                zcandles.update(c_)
+            except Exception as e:  # noqa: BLE001
+                print(f"  zones {pid}: {e}")
         try:
-            frames = coinbase_frames(p["product_id"], cc["timeframes"])
+            frames = coinbase_frames(p["product_id"], cc["timeframes"], fetch=fetch)
             if not frames:
                 continue
             ranges = scan_frames(frames, require_bos=rules["require_ar_break_of_structure"],
@@ -255,7 +384,7 @@ def scan_crypto(cfg) -> tuple[list[dict], dict]:
             sigs += signal_records("crypto", p["product_id"], coinbase_tv_symbol(p), frames, ranges, cfg)
         except Exception as e:  # noqa: BLE001
             print(f"  {p['product_id']}: {e}")
-    return sigs, {"symbols": len(prods), "missing": missing}
+    return sigs, {"symbols": len(prods), "missing": missing, "zones": zrecs, "zone_candles": zcandles}
 
 
 # ---------------------------------------------------------------- alerts ---
@@ -345,6 +474,75 @@ def push_alerts(signals, cfg, topic, opener=None) -> int:
     return sent
 
 
+def zone_alert_events(zones: list[dict], cfg) -> list[tuple[str, dict, str]]:
+    a = cfg["alerts"]
+    out = []
+    for g in zones:
+        for z in g["zones"]:
+            if a.get("zone_hit", True):
+                out.append((f"zone|{g['symbol']}|{g['side']}|{z['tf']}|{z['start']}|hit", g, f"{z['tf']} {g['side']} hit"))
+        for b in g["bojans"]:
+            if b["state"] == "formed" and a.get("zone_bojan", True):
+                out.append((f"zone|{g['symbol']}|{g['side']}|bojan|{b['tf']}|{b['start']}", g,
+                            f"Bojan {'low' if g['side'] == 'demand' else 'high'} on the {b['tf']}"))
+    return out
+
+
+def send_zone_ntfy(topic: str, g: dict, what: str, opener=None) -> None:
+    kind = "Demand" if g["side"] == "demand" else "Supply"
+    lines = [f"{kind} {' · '.join(g['tfs'])}  {g['lo']:g} - {g['hi']:g}", f"Price {g['price']:g} ({g['state']})"]
+    for z in g["zones"]:
+        lines.append(f"{z['tf']} {'structure' if z['kind'] == 'structure' else 'order block'} {z['lo']:g}-{z['hi']:g}")
+    for b in g["bojans"]:
+        lines.append(f"Bojan {b['state']} on {b['tf']} at {b['price']:g}")
+    dash = dashboard_url()
+    headers = {"Title": f"{g['symbol']} - {what}".encode("latin-1", "replace").decode("latin-1"),
+               "Tags": "green_circle" if g["side"] == "demand" else "red_circle",
+               "Priority": "default",
+               "Click": (dash + "#zone=" + g["id"]) if dash else g["tv"],
+               "Actions": f"view, TradingView, {g['tv']}"}
+    req = urllib.request.Request(f"https://ntfy.sh/{topic}", data="\n".join(lines).encode(), method="POST",
+                                 headers=headers)
+    (opener or urllib.request.urlopen)(req, timeout=20)
+
+
+def push_zone_alerts(zones, cfg, topic, opener=None) -> int:
+    topic = clean_topic(topic)
+    seen = set(json.loads(PUSHED.read_text())) if PUSHED.exists() else set()
+    seed = not any(k.startswith("zone|") for k in seen)      # first zone scan: record, don't flood
+    sent = 0
+    for key, g, what in zone_alert_events(zones, cfg):
+        if key in seen:
+            continue
+        if not seed and topic:
+            try:
+                send_zone_ntfy(topic, g, what, opener=opener)
+                sent += 1
+            except Exception as e:  # noqa: BLE001
+                print(f"  zone push failed for {g['symbol']}: {e}")
+                continue
+        seen.add(key)
+    if seed:
+        seen.add("zone|seeded")
+    PUSHED.parent.mkdir(parents=True, exist_ok=True)
+    PUSHED.write_text(json.dumps(sorted(seen), indent=0))
+    return sent
+
+
+def write_zones(now, zones: dict, zcandles: dict, cfg) -> None:
+    allz = sorted(zones["stocks"] + zones["crypto"], key=lambda z: z["touch"], reverse=True)
+    (OUT.parent / 'zones.json').parent.mkdir(parents=True, exist_ok=True)
+    (OUT.parent / 'zones.json').write_text(json.dumps({"generated_at": iso(now), "zones": allz}, separators=(",", ":")))
+    (OUT.parent / 'zones').mkdir(parents=True, exist_ok=True)
+    keep = {z["id"] for z in allz}
+    for f in (OUT.parent / 'zones').glob("*.json"):
+        if f.stem not in keep:
+            f.unlink()
+    for gid, c in zcandles.items():
+        if gid in keep:
+            ((OUT.parent / 'zones') / f"{gid}.json").write_text(json.dumps(c, separators=(",", ":")))
+
+
 # ------------------------------------------------------------------ main ---
 def main(now: datetime | None = None, opener=None) -> dict:
     now = now or datetime.now(timezone.utc)
@@ -356,6 +554,9 @@ def main(now: datetime | None = None, opener=None) -> dict:
     markets = dict(prev.get("markets", {}))
     signals = {"stocks": [s for s in prev.get("signals", []) if s["market"] == "stocks"],
                "crypto": [s for s in prev.get("signals", []) if s["market"] == "crypto"]}
+    zprev = json.loads((OUT.parent / 'zones.json').read_text()) if (OUT.parent / 'zones.json').exists() else {"zones": []}
+    zones = {m: [z for z in zprev.get("zones", []) if z["market"] == m] for m in ("stocks", "crypto")}
+    zcandles: dict = {}
 
     todo = []
     if cfg["stocks"].get("enabled") and (("stocks" in forced) if forced else stock_market_open(now)):
@@ -369,6 +570,9 @@ def main(now: datetime | None = None, opener=None) -> dict:
         try:
             sigs, info = fn(cfg)
             signals[name] = sigs
+            if "zones" in info:
+                zones[name] = info["zones"]
+                zcandles.update(info.get("zone_candles", {}))
             markets[name] = {"scanned_at": iso(now), "symbols": info["symbols"], "signals": len(sigs),
                              "missing": info.get("missing", []),
                              "seconds": round(time.time() - t0, 1), "error": None}
@@ -384,8 +588,11 @@ def main(now: datetime | None = None, opener=None) -> dict:
     allsig = sorted(signals["stocks"] + signals["crypto"], key=lambda s: s["time"], reverse=True)
     sent = push_alerts([s for name, _ in todo for s in signals[name]], cfg, os.environ.get("NTFY_TOPIC", "").strip(),
                        opener=opener)
+    sent += push_zone_alerts([z for name, _ in todo for z in zones[name]], cfg,
+                             os.environ.get("NTFY_TOPIC", "").strip(), opener=opener)
+    write_zones(now, zones, zcandles, cfg)
     out = {"generated_at": iso(now), "markets": markets, "alerts_sent": sent,
-           "config": {k: cfg[k] for k in ("stocks", "crypto", "rules", "alerts", "display")},
+           "config": {**{k: cfg[k] for k in ("stocks", "crypto", "rules", "alerts", "display")}, "zones": zone_cfg(cfg)},
            "signals": allsig}
     OUT.parent.mkdir(parents=True, exist_ok=True)
     OUT.write_text(json.dumps(out, separators=(",", ":")))
