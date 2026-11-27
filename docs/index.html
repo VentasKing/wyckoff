@@ -650,7 +650,7 @@ body.show-settings #zonesview{display:none}
         </div>
       </div>
       <div class="facts">
-        <div class="fact"><div class="muted" style="font-size:12px">Zone</div><div class="v">${num(g.lo)} – ${num(g.hi)}</div><div class="s">${g.zones.length} timeframe${g.zones.length === 1 ? '' : 's'} overlap</div></div>
+        <div class="fact"><div class="muted" style="font-size:12px">Zone</div><div class="v">${num(g.lo)} – ${num(g.hi)}</div><div class="s">${g.zones.length} zone${g.zones.length === 1 ? '' : 's'} on ${g.tfs.length} timeframe${g.tfs.length === 1 ? '' : 's'}</div></div>
         <div class="fact"><div class="muted" style="font-size:12px">Price</div><div class="v">${num(g.price)}</div><div class="s">${g.state === 'in zone' ? 'Trading in the zone' : 'Touched, now outside'}</div></div>
         <div class="fact"><div class="muted" style="font-size:12px">First touch</div><div class="v" style="font-size:14px">${esc(when(g.touch))}</div><div class="s">${esc(ago(g.touch))}</div></div>
         <div class="fact"><div class="muted" style="font-size:12px">Bojans</div><div class="v">${g.bojans.filter((b) => b.state === 'formed').length} formed · ${g.bojans.filter((b) => b.state === 'forming').length} forming</div><div class="s">wick in or touching the zone</div></div>

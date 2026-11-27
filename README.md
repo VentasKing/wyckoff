@@ -84,3 +84,21 @@ python -m pytest tests                 # tests on synthetic setups
 APCA_API_KEY_ID=... APCA_API_SECRET_KEY=... NTFY_TOPIC=... SCAN_MARKETS=stocks,crypto python scan.py
 python -m http.server -d docs          # dashboard at http://localhost:8000
 ```
+
+## Supply & demand tab
+
+Switch tabs at the top of the dashboard. Same stocks and coins as the Wyckoff scanner.
+
+* **Structure zone:** a bearish structure leg (each candle trading below the one before) that runs straight into a bullish candle leaving a fair value gap above the whole leg. The zone is the whole leg, wicks included. Supply is the mirror.
+* **Order block:** when the structure had already turned before the displacement candle, the last opposite candle before it, wicks included, with the gap above it.
+* **Fresh only:** a zone is listed at its first touch; second touches are ignored. A close through the far side drops it. Touched zones stay listed for `zones.keep_candles` candles of their timeframe, or for as long as price trades in them.
+* **Bojans:** formed (3–4 candles) or forming (2 candles, the newest still open) with a wick in or touching the zone, on the zone's timeframe or any lower one in the list.
+* **Groups:** zones on the same side are grouped under the highest-timeframe zone they overlap by at least half.
+* Timeframes: crypto 3W 2W 1W 6D–1D 18h 12h 8h–4h (built from Coinbase daily and hourly candles; hour candles restart at 00:00 UTC, multi-day candles count from 1970-01-01, multi-week from a Monday — TradingView's boundaries can differ slightly); stocks 2W 1W 1D 8h (8h = one regular session).
+
+| Setting | |
+|---|---|
+| `zones.enabled` | scan for zones |
+| `zones.crypto_timeframes`, `zones.stock_timeframes` | timeframes to look for zones on |
+| `zones.keep_candles` | how long a touched zone stays listed (candles on its timeframe) |
+| `alerts.zone_hit`, `alerts.zone_bojan` | phone alerts for a first touch and for a Bojan formed in a zone |
