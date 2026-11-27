@@ -843,6 +843,8 @@
 "zone|LINK-USD|demand|6h|2026-11-26T18:00:00Z|hit",
 "zone|LINK-USD|demand|7h|2026-11-26T21:00:00Z|hit",
 "zone|LINK-USD|demand|8h|2026-11-21T16:00:00Z|hit",
+"zone|LINK-USD|supply|12h|2026-11-13T12:00:00Z|hit",
+"zone|LINK-USD|supply|18h|2026-11-13T18:00:00Z|hit",
 "zone|LINK-USD|supply|1D|2026-11-13T00:00:00Z|hit",
 "zone|LINK-USD|supply|3W|2025-10-13T00:00:00Z|hit",
 "zone|LINK-USD|supply|3W|2026-01-05T00:00:00Z|hit",
