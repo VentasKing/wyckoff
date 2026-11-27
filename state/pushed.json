@@ -854,6 +854,7 @@
 "zone|LINK-USD|supply|3W|2026-01-05T00:00:00Z|hit",
 "zone|LINK-USD|supply|4h|2026-11-14T08:00:00Z|hit",
 "zone|LINK-USD|supply|5h|2026-11-14T05:00:00Z|hit",
+"zone|LINK-USD|supply|bojan|18h|2026-11-26T18:00:00Z",
 "zone|LINK-USD|supply|bojan|8h|2026-09-05T16:00:00Z",
 "zone|LLY|demand|1D|2026-11-06T05:00:00Z|hit",
 "zone|LLY|demand|8h|2026-11-06T14:30:00Z|hit",
