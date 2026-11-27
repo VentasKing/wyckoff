@@ -240,10 +240,19 @@ def zone_records(market: str, symbol: str, tv_symbol: str, frames: dict, cfg) ->
                      "state": "in zone" if in_zone else "touched",
                      "touch": max(z["touch"] for z in zs), "zones": zs, "bojans": uniq,
                      "tv": tv_link(tv_symbol, top.tf)})
-        chart_tfs = sorted({z.tf for z in g} | {b["tf"] for b in uniq}, key=tf_rank, reverse=True)
-        candles[gid] = {tf: [[int(ts.value // 10**9), rnd(r.open), rnd(r.high), rnd(r.low), rnd(r.close)]
-                             for ts, r in frames[tf].iloc[-150:].iterrows()] for tf in chart_tfs}
+        recs[-1]["tfs"] = list(dict.fromkeys(recs[-1]["tfs"]))
+        recs[-1]["chart"] = symbol_file(symbol)
+        for tf in {z.tf for z in g} | {b["tf"] for b in uniq}:
+            candles.setdefault(symbol_file(symbol), {})[tf] = None
+    for fname, tfmap in candles.items():
+        for tf in tfmap:
+            tfmap[tf] = [[int(ts.value // 10**9), rnd(o), rnd(h), rnd(l), rnd(c)]
+                         for ts, o, h, l, c in frames[tf][["open", "high", "low", "close"]].iloc[-120:].itertuples()]
     return recs, candles
+
+
+def symbol_file(symbol: str) -> str:
+    return re.sub(r"[^A-Za-z0-9_-]", "-", symbol)
 
 
 def crypto_zone_frames(natives: dict, tfs: list[str]) -> dict:
@@ -534,13 +543,13 @@ def write_zones(now, zones: dict, zcandles: dict, cfg) -> None:
     (OUT.parent / 'zones.json').parent.mkdir(parents=True, exist_ok=True)
     (OUT.parent / 'zones.json').write_text(json.dumps({"generated_at": iso(now), "zones": allz}, separators=(",", ":")))
     (OUT.parent / 'zones').mkdir(parents=True, exist_ok=True)
-    keep = {z["id"] for z in allz}
+    keep = {z["chart"] for z in allz if z.get("chart")}
     for f in (OUT.parent / 'zones').glob("*.json"):
         if f.stem not in keep:
             f.unlink()
-    for gid, c in zcandles.items():
-        if gid in keep:
-            ((OUT.parent / 'zones') / f"{gid}.json").write_text(json.dumps(c, separators=(",", ":")))
+    for name, c in zcandles.items():
+        if name in keep:
+            ((OUT.parent / 'zones') / f"{name}.json").write_text(json.dumps(c, separators=(",", ":")))
 
 
 # ------------------------------------------------------------------ main ---

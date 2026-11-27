@@ -66,7 +66,7 @@ main{padding:0 24px 28px;display:flex;flex-wrap:wrap;gap:18px;align-items:flex-s
 .dtitle h1{margin:0;font-size:22px;letter-spacing:-.01em}
 .sidepill{font-size:12px;font-weight:600;padding:3px 8px;border-radius:999px;border:1px solid}
 .sp-a{color:var(--acc);border-color:#24466E}.sp-d{color:var(--dist);border-color:#5C3A15}
-#chart{height:430px;margin-top:14px;border-radius:8px;border:1px solid var(--line2);overflow:hidden}
+#chart,#zchart{height:430px;margin-top:14px;border-radius:8px;border:1px solid var(--line2);overflow:hidden}
 .legend{display:flex;flex-wrap:wrap;gap:14px;margin-top:10px;font-size:12px;color:var(--muted)}
 .legend span{display:inline-flex;align-items:center;gap:6px}
 .facts{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px}
@@ -122,6 +122,28 @@ body.show-settings #dash{display:none}body.show-settings #settings{display:block
   .donebadge{font-size:11px;font-weight:600;color:#8BD5A6;border:1px solid #24503A;background:#13261B;padding:2px 7px;border-radius:999px}
 .toast button{margin-left:10px;border:0;background:none;color:#7DB8FF;font-weight:700;cursor:pointer;padding:4px 6px}
 .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#1E2733;border:1px solid #2B3542;color:var(--text);padding:10px 16px;border-radius:10px;font-size:13px;z-index:10;box-shadow:0 6px 24px rgba(0,0,0,.4)}
+.tabs{display:flex;gap:4px;padding:4px;background:#0D1218;border:1px solid var(--line);border-radius:10px}
+.tabs button{height:32px;padding:0 16px;border:0;border-radius:7px;background:transparent;color:var(--muted);font-weight:600;font-size:13px;cursor:pointer}
+.tabs button:hover{color:var(--text)}
+.tabs button[aria-selected=true]{background:#1E2733;color:var(--text);box-shadow:inset 0 0 0 1px #2B3542}
+#zonesview{display:none}
+body.show-zones #dash{display:none}body.show-zones #zonesview{display:block}
+body.show-settings #zonesview{display:none}
+.sp-dem{color:#4CC38A;border-color:#24503A}.sp-sup{color:#F08C6C;border-color:#5C3324}
+.side-dem{color:#4CC38A;font-size:11px}.side-sup{color:#F08C6C;font-size:11px}
+.st-inzone{color:#CFF0DA;background:#13261B;border-color:#24503A}
+.st-touched{color:var(--soft);background:#1A212B;border-color:#323D4B}
+.fbadge{color:#E879C0;border:1px dashed rgba(232,121,192,.5);border-radius:999px;padding:1px 7px;font-size:11px;white-space:nowrap}
+.zt{width:100%;border-collapse:collapse;font-size:13px}
+.zt th{text-align:left;font-size:12px;font-weight:600;color:var(--muted);padding:6px 8px;border-bottom:1px solid var(--line2)}
+.zt td{padding:8px;border-bottom:1px solid var(--line2);vertical-align:top}
+.zt td.mono{white-space:nowrap}
+@media (max-width:820px){
+  .tabs{order:3;width:100%}.tabs button{flex:1}
+  body.show-zones.has-zsel #zonesview .list,body.show-zones.has-zsel #zonesview .stats,body.show-zones.has-zsel #zonesview .filters{display:none}
+  body.show-zones:not(.has-zsel) #zdetail{display:none}
+  #zchart{height:300px}
+}
 @media (max-width:820px){
   header,.stats,.filters,main{padding-left:14px;padding-right:14px}
   .scaninfo{text-align:left}
@@ -141,6 +163,10 @@ body.show-settings #dash{display:none}body.show-settings #settings{display:block
     <svg width="30" height="30" viewBox="0 0 30 30" fill="none" aria-hidden="true"><rect x="1" y="1" width="28" height="28" rx="7" stroke="#4C9EFF" stroke-width="2"/><path d="M6 10 L10 20 L14 12 L18 21 L23 9" stroke="#4C9EFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="18" cy="21" r="2.4" fill="#F5A524"/></svg>
     <div><b>Tap Scanner</b><small>Wyckoff 2nd &amp; 3rd taps · stocks &amp; Coinbase crypto</small></div>
   </div>
+  <nav class="tabs" role="tablist" aria-label="Scanner">
+    <button type="button" role="tab" id="tab-taps" aria-selected="true">Wyckoff taps</button>
+    <button type="button" role="tab" id="tab-zones" aria-selected="false">Supply &amp; demand</button>
+  </nav>
   <div class="hright">
     <div class="scaninfo" id="scaninfo">Loading…</div>
     <div class="scanning" id="scanning" role="status"><span class="spin" aria-hidden="true"></span>Scanning…</div>
@@ -169,6 +195,24 @@ body.show-settings #dash{display:none}body.show-settings #settings{display:block
       <div class="rows" id="rows"></div>
     </section>
     <section class="detail" id="detail" aria-label="Selected setup"></section>
+  </main>
+</div>
+
+<div id="zonesview">
+  <section class="stats" id="zstats"></section>
+  <section class="filters" aria-label="Zone filters">
+    <div class="fgroup" id="zf-market"><span>Market</span></div>
+    <div class="fgroup" id="zf-side"><span>Side</span></div>
+    <div class="fgroup" id="zf-tf"><span>Timeframe</span></div>
+    <div class="fgroup"><button type="button" class="chip" id="zf-bojan" aria-pressed="false">Bojan only</button>
+      <button type="button" class="chip" id="zf-done" aria-pressed="false">Done</button></div>
+  </section>
+  <main>
+    <section class="list" aria-label="Zones">
+      <div class="listhead"><div><b id="zlisttitle">Zones hit</b> <span class="muted" id="zlistcount"></span></div><span class="muted" style="font-size:12px">Latest touch first</span></div>
+      <div class="rows" id="zrows"></div>
+    </section>
+    <section class="detail" id="zdetail" aria-label="Selected zone"></section>
   </main>
 </div>
 
@@ -245,6 +289,7 @@ body.show-settings #dash{display:none}body.show-settings #settings{display:block
 
   async function load() {
     const marksChanged = await pullMarks();
+    const zonesChanged = await loadZones();
     let fresh = null;
     try {
       const r = await fetch('data/signals.json?t=' + Date.now(), { cache: 'no-store' });
@@ -257,7 +302,7 @@ body.show-settings #dash{display:none}body.show-settings #settings{display:block
       const isNew = lastGen !== null && fresh.generated_at && fresh.generated_at !== lastGen;
       DATA = fresh;
       if (fresh.generated_at) lastGen = fresh.generated_at;
-      if (!isNew && DATA_LOADED_ONCE && !marksChanged) { refreshScanInfo(); return; }      // nothing new: don't redraw
+      if (!isNew && DATA_LOADED_ONCE && !marksChanged && !zonesChanged) { refreshScanInfo(); return; }      // nothing new: don't redraw
       if (isNew) {
         const live = fresh.signals.filter((x) => x.live).length;
         const errs = Object.values(fresh.markets || {}).filter((m) => m.error && m.error_at === fresh.generated_at).length;
@@ -357,6 +402,12 @@ body.show-settings #dash{display:none}body.show-settings #settings{display:block
     const id = decodeURIComponent(location.hash.slice(1));
     document.body.classList.toggle('show-settings', id === 'settings');
     if (id === 'settings') { renderSettings(true); return; }
+    const zonesTab = tabIsZones();
+    document.body.classList.toggle('show-zones', zonesTab);
+    $('#tab-taps').setAttribute('aria-selected', !zonesTab);
+    $('#tab-zones').setAttribute('aria-selected', zonesTab);
+    if (zonesTab) { store.set('tab', 'zones'); renderZones(); return; }
+    store.set('tab', 'taps');
     const found = DATA.signals.find((s) => s.id === id);
     sel = found || (window.innerWidth > 820 ? vis[0] : null) || null;
     document.body.classList.toggle('has-sel', !!found);
@@ -487,6 +538,217 @@ body.show-settings #dash{display:none}body.show-settings #settings{display:block
     chart.timeScale().fitContent();
   }
 
+  // ---------------------------------------------------------------- zones --
+  const ZTF = ['4h', '5h', '6h', '7h', '8h', '12h', '18h', '1D', '2D', '3D', '4D', '5D', '6D', '1W', '2W', '3W'];
+  let ZDATA = null, zsel = null, zchart = null, zchartTf = null;
+  const zcandles = {};
+  const ZF = { market: 'All', side: 'All', tfs: {}, bojan: false, showDone: false };
+  const zid = () => (location.hash.startsWith('#zone=') ? decodeURIComponent(location.hash.slice(6)) : null);
+  const tabIsZones = () => { const h = location.hash; if (h.startsWith('#zone=') || h === '#zones') return true;
+    if (h && h !== '#' && h !== '#settings') return false; return store.get('tab', 'taps') === 'zones'; };
+
+  async function loadZones() {
+    try {
+      const r = await fetch('data/zones.json?t=' + Date.now(), { cache: 'no-store' });
+      if (!r.ok) throw new Error(r.status);
+      const z = await r.json();
+      const changed = !ZDATA || ZDATA.generated_at !== z.generated_at;
+      ZDATA = z;
+      return changed;
+    } catch (e) { if (!ZDATA) ZDATA = { zones: [], generated_at: null }; return false; }
+  }
+
+  function zvisible() {
+    return ZDATA.zones.filter((g) => (ZF.market === 'All' || g.market === ZF.market.toLowerCase()) &&
+      (ZF.side === 'All' || g.side === ZF.side.toLowerCase()) && g.tfs.some((t) => ZF.tfs[t] !== false) &&
+      (!ZF.bojan || g.bojans.length) && (ZF.showDone ? isDone(g.id) : !isDone(g.id)));
+  }
+
+  const sideWord = (g) => (g.side === 'demand' ? 'Demand' : 'Supply');
+  const bojanBadges = (g, big) => {
+    const f = g.bojans.filter((b) => b.state === 'formed'), p = g.bojans.filter((b) => b.state === 'forming');
+    const st = big ? ' style="font-size:12px;padding:3px 8px"' : '';
+    return (f.length ? `<span class="bbadge"${st}>◉ Bojan ${f.map((b) => esc(b.tf)).join(' · ')}</span>` : '') +
+           (p.length ? `<span class="fbadge"${st}>◌ forming ${p.map((b) => esc(b.tf)).join(' · ')}</span>` : '');
+  };
+
+  function renderZones() {
+    if (!ZDATA) return;
+    const all = ZDATA.zones;
+    const present = ZTF.filter((t) => all.some((g) => g.tfs.includes(t)));
+    chips($('#zf-market'), ['All', 'Stocks', 'Crypto'].map((x) => [x, ZF.market === x, () => { ZF.market = x; renderZones(); }]));
+    chips($('#zf-side'), ['All', 'Demand', 'Supply'].map((x) => [x, ZF.side === x, () => { ZF.side = x; renderZones(); }]));
+    chips($('#zf-tf'), present.map((t) => [t, ZF.tfs[t] !== false, () => { ZF.tfs[t] = ZF.tfs[t] === false; renderZones(); }]));
+    $('#zf-bojan').setAttribute('aria-pressed', ZF.bojan);
+    $('#zf-bojan').onclick = () => { ZF.bojan = !ZF.bojan; renderZones(); };
+    const nDone = all.filter((g) => isDone(g.id)).length;
+    $('#zf-done').textContent = nDone ? `Done · ${nDone}` : 'Done';
+    $('#zf-done').setAttribute('aria-pressed', ZF.showDone);
+    $('#zf-done').onclick = () => { ZF.showDone = !ZF.showDone; history.replaceState('', document.title, location.pathname + '#zones'); renderZones(); };
+
+    const vis = zvisible();
+    $('#zstats').innerHTML = [
+      ['Zones hit', vis.length, '#4C9EFF'],
+      ['Price in zone now', vis.filter((g) => g.state === 'in zone').length, '#4CC38A'],
+      ['Bojan formed', vis.filter((g) => g.bojans.some((b) => b.state === 'formed')).length, '#E879C0'],
+      ['Bojan forming', vis.filter((g) => g.bojans.some((b) => b.state === 'forming')).length, '#C9D2DD'],
+    ].map(([l, v, c]) => `<div class="stat"><div class="muted" style="font-size:12px">${l}</div><div class="v">${v}<span class="dot" style="background:${c}"></span></div></div>`).join('');
+
+    $('#zlisttitle').textContent = ZF.showDone ? 'Marked done' : 'Zones hit';
+    $('#zlistcount').textContent = '· ' + vis.length;
+    const rows = $('#zrows');
+    if (!ZDATA.generated_at) rows.innerHTML = '<div class="empty">No zone results yet. They come with the next scan.</div>';
+    else if (!vis.length) rows.innerHTML = `<div class="empty">${ZF.showDone ? 'Nothing marked done yet.' : 'No zones match these filters.'}</div>`;
+    else rows.innerHTML = vis.map((g) => `
+      <button type="button" class="sig" data-zid="${esc(g.id)}" aria-current="${zsel && zsel.id === g.id}">
+        <div class="r1"><span style="display:flex;align-items:center;gap:8px;min-width:0">
+          <span class="${g.side === 'demand' ? 'side-dem' : 'side-sup'}">${g.side === 'demand' ? '▲' : '▼'}</span>
+          <span class="sym">${esc(g.symbol)}</span><span class="muted" style="font-size:11px">${g.market === 'stocks' ? 'Stock' : 'Crypto'}</span></span>
+          ${isDone(g.id) ? '<span class="donebadge">✓ Done</span>' : `<span class="state ${g.state === 'in zone' ? 'st-inzone' : 'st-touched'}">${g.state === 'in zone' ? 'In zone' : 'Touched'}</span>`}</div>
+        <div class="r2"><span style="display:flex;gap:4px;flex-wrap:wrap">${g.tfs.map((t) => `<span class="tf">${esc(t)}</span>`).join('')}</span><span class="muted">${esc(ago(g.touch))}</span></div>
+        <div class="r3"><span>${sideWord(g).toLowerCase()} ${num(g.lo)} – ${num(g.hi)}</span><span style="display:flex;gap:6px">${bojanBadges(g)}</span></div>
+      </button>`).join('');
+    rows.querySelectorAll('.sig').forEach((el) => el.onclick = () => { location.hash = 'zone=' + encodeURIComponent(el.dataset.zid); });
+
+    const id = zid();
+    const found = id && all.find((g) => g.id === id);
+    if (!found || !zsel || zsel.id !== found.id) zchartTf = null;
+    zsel = found || (window.innerWidth > 820 ? vis[0] : null) || null;
+    document.body.classList.toggle('has-zsel', !!found);
+    rows.querySelectorAll('.sig').forEach((el) => el.setAttribute('aria-current', !!zsel && el.dataset.zid === zsel.id));
+    renderZoneDetail();
+  }
+
+  function renderZoneDetail() {
+    const d = $('#zdetail'), g = zsel;
+    if (!g) { d.innerHTML = ZDATA.generated_at ? '<div class="card empty">Pick a zone to see its chart.</div>' : ''; return; }
+    const dem = g.side === 'demand';
+    const kindName = (k) => (k === 'structure' ? 'Structure ' + (dem ? 'demand' : 'supply') : 'Order block');
+    d.innerHTML = `
+      <div class="card">
+        <button type="button" class="back" id="zbackbtn">‹ Zones</button>
+        <div class="dhead">
+          <div>
+            <div class="dtitle"><h1>${esc(g.symbol)}</h1>
+              <span class="sidepill ${dem ? 'sp-dem' : 'sp-sup'}">${dem ? '▲ Demand' : '▼ Supply'}</span>
+              <span class="state ${g.state === 'in zone' ? 'st-inzone' : 'st-touched'}" style="font-size:12px;padding:3px 8px">${g.state === 'in zone' ? 'Price in zone' : 'Touched'}</span>
+              ${bojanBadges(g, true)}</div>
+            <div class="muted" style="margin-top:6px;font-size:13px">${g.tfs.map(esc).join(' · ')} · ${num(g.lo)} – ${num(g.hi)} · first touch ${esc(when(g.touch))}</div>
+          </div>
+          <div class="btns" style="display:flex;gap:8px;flex-wrap:wrap">
+            <a class="btn" id="ztv" href="${esc(g.tv)}" target="_blank" rel="noopener">Open in TradingView ↗</a>
+            <button type="button" class="btn ${isDone(g.id) ? 'ghost' : ''}" id="zdonebtn">${isDone(g.id) ? 'Undo done' : '✓ Done'}</button>
+          </div>
+        </div>
+        <div class="fgroup" id="zctf" style="margin-top:12px"><span>Chart</span></div>
+        <div id="zchart" role="img" aria-label="Chart of ${esc(g.symbol)} with the ${dem ? 'demand' : 'supply'} zones marked"></div>
+        <div class="legend">
+          <span><span style="width:16px;height:2px;background:${dem ? '#4CC38A' : '#F08C6C'}"></span>Zone on this timeframe</span>
+          <span><span style="width:16px;border-top:2px dashed ${dem ? '#4CC38A' : '#F08C6C'}"></span>Whole group (all timeframes)</span>
+          ${g.bojans.length ? '<span><span style="width:8px;height:8px;border-radius:50%;background:#E879C0"></span>Bojan on this timeframe</span>' : ''}
+          <span class="muted">Times in ${esc(tz())}</span>
+        </div>
+      </div>
+      <div class="facts">
+        <div class="fact"><div class="muted" style="font-size:12px">Zone</div><div class="v">${num(g.lo)} – ${num(g.hi)}</div><div class="s">${g.zones.length} timeframe${g.zones.length === 1 ? '' : 's'} overlap</div></div>
+        <div class="fact"><div class="muted" style="font-size:12px">Price</div><div class="v">${num(g.price)}</div><div class="s">${g.state === 'in zone' ? 'Trading in the zone' : 'Touched, now outside'}</div></div>
+        <div class="fact"><div class="muted" style="font-size:12px">First touch</div><div class="v" style="font-size:14px">${esc(when(g.touch))}</div><div class="s">${esc(ago(g.touch))}</div></div>
+        <div class="fact"><div class="muted" style="font-size:12px">Bojans</div><div class="v">${g.bojans.filter((b) => b.state === 'formed').length} formed · ${g.bojans.filter((b) => b.state === 'forming').length} forming</div><div class="s">wick in or touching the zone</div></div>
+      </div>
+      <div class="card"><h2>Zones in this group</h2>
+        <table class="zt"><thead><tr><th>TF</th><th>Type</th><th>Range</th><th>Formed</th><th>First touch</th><th></th></tr></thead><tbody>
+        ${g.zones.map((z) => `<tr><td><span class="tf">${esc(z.tf)}</span></td><td>${esc(kindName(z.kind))}</td><td class="mono">${num(z.lo)} – ${num(z.hi)}</td>
+          <td>${esc(when(z.start))}${z.end !== z.start ? ' → ' + esc(when(z.end)) : ''}<div class="muted" style="font-size:12px">gap completed ${esc(when(z.fvg))}</div></td>
+          <td>${esc(when(z.touch))}<div class="muted" style="font-size:12px">${z.touch_bars_ago === 0 ? 'this candle' : z.touch_bars_ago + ' candle' + (z.touch_bars_ago === 1 ? '' : 's') + ' ago'}</div></td>
+          <td><a href="${esc(z.tv)}" target="_blank" rel="noopener">${esc(z.tf)} chart ↗</a></td></tr>`).join('')}
+        </tbody></table></div>
+      ${g.bojans.length ? `<div class="card"><h2>Bojan ${dem ? 'lows' : 'highs'}</h2>
+        <table class="zt"><thead><tr><th>TF</th><th>State</th><th>Candles</th><th>${dem ? 'Deepest wick' : 'Highest wick'}</th><th></th></tr></thead><tbody>
+        ${g.bojans.map((b) => `<tr><td><span class="tf">${esc(b.tf)}</span></td><td>${b.state === 'formed' ? '◉ Formed' : '◌ Forming (2 candles, the newest still open)'}</td>
+          <td>${b.candles} from ${esc(when(b.start))}</td><td class="mono">${num(b.price)}<div class="muted" style="font-size:12px;font-family:Inter,system-ui,sans-serif">${esc(when(b.time))}</div></td>
+          <td><a href="${esc(b.tv)}" target="_blank" rel="noopener">${esc(b.tf)} chart ↗</a></td></tr>`).join('')}
+        </tbody></table></div>` : ''}`;
+    $('#zbackbtn').onclick = () => { history.pushState('', document.title, location.pathname + '#zones'); renderZones(); window.scrollTo(0, 0); };
+    $('#zdonebtn').onclick = () => {
+      const wasDone = isDone(g.id);
+      setDone(g.id, !wasDone);
+      history.replaceState('', document.title, location.pathname + '#zones');
+      renderZones();
+      if (!wasDone) toast(`${g.symbol} ${g.side} marked done`, 'Undo', () => { setDone(g.id, false); location.hash = 'zone=' + encodeURIComponent(g.id); });
+      else toast(`${g.symbol} ${g.side} is back in the list`);
+    };
+    drawZoneChart(g);
+  }
+
+  async function drawZoneChart(g) {
+    const el = $('#zchart');
+    if (zchart) { zchart.remove(); zchart = null; }
+    if (!window.LightweightCharts) { el.innerHTML = '<div class="empty">The chart library didn’t load. Check your connection and refresh.</div>'; return; }
+    let data = zcandles[g.chart || g.id];
+    if (!data) {
+      el.innerHTML = '<div class="empty">Loading chart…</div>';
+      try { const r = await fetch(`data/zones/${encodeURIComponent(g.chart || g.id)}.json?t=${encodeURIComponent(ZDATA.generated_at || '')}`); data = r.ok ? await r.json() : {}; }
+      catch (e) { data = {}; }
+      zcandles[g.chart || g.id] = data;
+      if (!zsel || zsel.id !== g.id) return;
+      el.innerHTML = '';
+    }
+    const tfs = ZTF.filter((t) => data[t]).reverse();
+    if (!tfs.length) { el.innerHTML = '<div class="empty">No chart data for this zone.</div>'; return; }
+    if (!zchartTf || !data[zchartTf]) zchartTf = g.tfs.find((t) => data[t]) || tfs[0];
+    chips($('#zctf'), tfs.map((t) => [t, t === zchartTf, () => { zchartTf = t; drawZoneChart(g); }]));
+    const zt = g.zones.find((z) => z.tf === zchartTf);
+    $('#ztv').href = zt ? zt.tv : (g.bojans.find((b) => b.tf === zchartTf) || g).tv;
+    const LC = window.LightweightCharts;
+    const intraday = zchartTf.endsWith('h');
+    const tfmt = (t, o) => new Intl.DateTimeFormat('en-US', Object.assign({ timeZone: tz() }, o)).format(new Date(t * 1000));
+    zchart = LC.createChart(el, {
+      autoSize: true,
+      layout: { background: { color: '#0D1218' }, textColor: '#9AA6B5', fontFamily: 'Inter, system-ui, sans-serif' },
+      grid: { vertLines: { color: '#151C24' }, horzLines: { color: '#151C24' } },
+      rightPriceScale: { borderColor: '#222B36' },
+      timeScale: { borderColor: '#222B36', timeVisible: intraday, rightOffset: 6,
+        tickMarkFormatter: (t, type) => tfmt(t, type === 0 ? { year: 'numeric' } : type === 1 ? { month: 'short' } : type === 2 ? { month: 'short', day: 'numeric' } : { hour: 'numeric', minute: '2-digit' }) },
+      localization: { timeFormatter: (t) => tfmt(t, intraday ? { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' } : { month: 'short', day: 'numeric', year: 'numeric' }) },
+      crosshair: { mode: LC.CrosshairMode.Normal },
+    });
+    const ser = zchart.addCandlestickSeries({ upColor: '#26A69A', downColor: '#EF5350', borderVisible: false, wickUpColor: '#26A69A', wickDownColor: '#EF5350' });
+    const rows = data[zchartTf];
+    ser.setData(rows.map(([t, o, h, l, c]) => ({ time: t, open: o, high: h, low: l, close: c })));
+    const dem = g.side === 'demand', col = dem ? '#4CC38A' : '#F08C6C', L = LC.LineStyle;
+    const mine = g.zones.filter((z) => z.tf === zchartTf);
+    for (const z of mine) {
+      ser.createPriceLine({ price: z.hi, color: col, lineWidth: 2, lineStyle: L.Solid, axisLabelVisible: true, title: z.tf });
+      ser.createPriceLine({ price: z.lo, color: col, lineWidth: 2, lineStyle: L.Solid, axisLabelVisible: true, title: '' });
+    }
+    if (!mine.length || g.zones.length > mine.length) {      // the whole group's span
+      ser.createPriceLine({ price: g.hi, color: col, lineWidth: 1, lineStyle: L.Dashed, axisLabelVisible: !mine.length, title: mine.length ? '' : 'group' });
+      ser.createPriceLine({ price: g.lo, color: col, lineWidth: 1, lineStyle: L.Dashed, axisLabelVisible: !mine.length, title: '' });
+    }
+    const times = new Set(rows.map((r) => r[0]));
+    const marks = [];
+    for (const z of g.zones.filter((z) => z.tf === zchartTf)) {
+      const t = Math.floor(new Date(z.touch) / 1000);
+      if (times.has(t)) marks.push({ time: t, position: dem ? 'belowBar' : 'aboveBar', color: col, shape: dem ? 'arrowUp' : 'arrowDown', text: 'first touch' });
+      const s0 = Math.floor(new Date(z.start) / 1000);
+      if (times.has(s0)) marks.push({ time: s0, position: dem ? 'belowBar' : 'aboveBar', color: '#8A94A3', shape: 'square', text: z.kind === 'structure' ? 'zone (leg)' : 'OB' });
+    }
+    for (const b of g.bojans.filter((b) => b.tf === zchartTf)) {
+      const t = Math.floor(new Date(b.time) / 1000);
+      if (times.has(t)) marks.push({ time: t, position: dem ? 'belowBar' : 'aboveBar', color: '#E879C0', shape: 'circle', text: b.state === 'formed' ? 'Bojan' : 'forming' });
+    }
+    ser.setMarkers(marks.sort((a, b) => a.time - b.time));
+    zchart.timeScale().fitContent();
+  }
+
+  function setTab(t) {
+    store.set('tab', t);
+    location.hash = t === 'zones' ? 'zones' : '';
+    if (t !== 'zones') { history.replaceState('', document.title, location.pathname + location.search); render(); }
+  }
+  $('#tab-taps').onclick = () => setTab('taps');
+  $('#tab-zones').onclick = () => setTab('zones');
+
   // ------------------------------------------------------------ settings --
   const API = gh ? `https://api.github.com/repos/${owner}/${repo}` : null;
   let token = store.get('gh_token', '');
@@ -599,6 +861,7 @@ body.show-settings #dash{display:none}body.show-settings #settings{display:block
     { const v = c.rules.bojan_min_wick ?? 0.4; if (!(typeof v === 'number' && v > 0 && v < 1)) errs.push('Bojan wick share must be between 0 and 1.'); }
     n(c.rules.bojan_timeframes_below ?? 2, 0, 6, 'Bojan timeframes below');
     { const v = c.rules.tap3_zone_tolerance ?? 0.05; if (!(typeof v === 'number' && v >= 0 && v <= 1)) errs.push('Order block tolerance must be a number from 0 to 1.'); }
+    if (c.zones) n(c.zones.keep_candles, 1, 500, 'Zone keep candles');
     { const v = c.rules.min_tap3_spacing ?? 0.25; if (!(typeof v === 'number' && v >= 0 && v <= 2)) errs.push('Tap 3 spacing must be a number from 0 to 2.'); }
     n(c.alerts.max_bars_ago, 0, 100, 'Alert window');
     n(c.display.history_days, 1, 60, 'History days');
@@ -655,9 +918,9 @@ body.show-settings #dash{display:none}body.show-settings #settings{display:block
     </div>`;
   }
 
-  function tfChips(path) {
+  function tfChips(path, order) {
     const on = new Set(getp(draft, path));
-    return `<div class="tags">${TF_ORDER.map((t) => `<button type="button" class="chip" data-tf="${path}" data-v="${t}" aria-pressed="${on.has(t)}">${t}</button>`).join('')}</div>`;
+    return `<div class="tags">${(order || TF_ORDER).map((t) => `<button type="button" class="chip" data-tf="${path}" data-v="${t}"${order ? ' data-zo="1"' : ''} aria-pressed="${on.has(t)}">${t}</button>`).join('')}</div>`;
   }
   function sw(path, label, help) {
     return `<div class="fld"><div class="row"><div><div style="font-size:13px;font-weight:600">${label}</div>${help ? `<div class="help">${help}</div>` : ''}</div>
@@ -697,6 +960,7 @@ body.show-settings #dash{display:none}body.show-settings #settings{display:block
       <div class="card"><h2>Crypto</h2>${kv('Scanning', c.crypto.enabled ? esc(c.crypto.universe) : 'Off')}${kv('Timeframes', esc(c.crypto.timeframes.join(' · ')))}
         <div class="muted" style="font-size:12px;margin-top:8px">My list · ${c.crypto.products.length} coins</div>${tags(c.crypto.products)}</div>
       <div class="card"><h2>Model rules</h2>${kv('Tap 2 is complete when price…', esc(T2[c.rules.tap2_return] || c.rules.tap2_return))}${kv('Require the AR to break structure', yes(c.rules.require_ar_break_of_structure))}${kv('Allow ranges inside larger ranges', yes(c.rules.allow_nested_ranges))}${kv('Tap 1 must close beyond every close of the last', (c.rules.trend_lookback ?? 50) + ' candles')}${kv('Deviations of the other end allowed', c.rules.max_opposite_deviations ?? 1)}${kv('Tap 2 → tap 3 must take at least', Math.round((c.rules.min_tap3_spacing ?? 0.25) * 100) + '% of tap 1 → tap 2')}</div>
+      ${c.zones ? `<div class="card"><h2>Supply &amp; demand</h2>${kv('Scanning', yes(c.zones.enabled))}${kv('Crypto timeframes', esc(c.zones.crypto_timeframes.join(' · ')))}${kv('Stock timeframes', esc(c.zones.stock_timeframes.join(' · ')))}${kv('Keep a touched zone listed for', c.zones.keep_candles + ' candles')}${kv('Alert: zone first touched', yes(c.alerts.zone_hit ?? true))}${kv('Alert: Bojan in a zone', yes(c.alerts.zone_bojan ?? true))}</div>` : ''}
       <div class="card"><h2>Phone alerts</h2>${kv('Tap 3 potential', yes(c.alerts.tap3_potential))}${kv('Tap 3 confirmed', yes(c.alerts.tap3_confirmed))}${kv('Model 1 forming', yes(c.alerts.model1_forming))}${kv('Only taps from the last', c.alerts.max_bars_ago + ' bars')}${kv('Time zone', esc(c.display.timezone))}</div>`;
   }
 
@@ -720,6 +984,9 @@ body.show-settings #dash{display:none}body.show-settings #settings{display:block
     d.rules.tap3_zone_tolerance = d.rules.tap3_zone_tolerance ?? 0.05;
     d.rules.bojan_min_wick = d.rules.bojan_min_wick ?? 0.4;
     d.rules.bojan_timeframes_below = d.rules.bojan_timeframes_below ?? 2;
+    d.zones = Object.assign({ enabled: true, crypto_timeframes: ZTF.slice(), stock_timeframes: ['8h', '1D', '1W', '2W'], keep_candles: 6 }, d.zones || {});
+    d.alerts.zone_hit = d.alerts.zone_hit ?? true;
+    d.alerts.zone_bojan = d.alerts.zone_bojan ?? true;
     g.innerHTML = `
       <div class="card" style="grid-column:1/-1"><h2>Scanning</h2>
         ${sw('schedule.automatic', 'Automatic scans every 30 minutes', 'Off: scans only run when you press Scan now (stocks on weekdays 9:00–17:00 New York, crypto around the clock)')}</div>
@@ -747,11 +1014,18 @@ body.show-settings #dash{display:none}body.show-settings #settings{display:block
         ${sw('alerts.tap3_potential', 'Tap 3 potential', 'An extreme level or zone was hit')}
         ${sw('alerts.tap3_confirmed', 'Tap 3 confirmed', 'Structure broke after the tap')}
         ${sw('alerts.model1_forming', 'Model 1 forming', 'Price is deviating the tap 2 extreme')}
+        ${sw('alerts.zone_hit', 'Zone first touched', 'Supply & demand tab: price traded into a fresh zone')}
+        ${sw('alerts.zone_bojan', 'Bojan in a zone', 'Supply & demand tab: a Bojan formed with a wick in a zone')}
         ${numf('alerts.max_bars_ago', 'Only alert for taps from the last (candles)', '', 5)}
         ${selField('display.timezone', 'Time zone', TZS)}
         ${numf('display.history_days', 'Days of history in “All setups”', '', 14)}
         ${numf('display.max_live_bars', 'A tap 3 stays live for (candles on its timeframe)', '', 30)}
-        <div class="fld"><button type="button" class="btn ghost" id="disconnect">Disconnect this browser</button></div></div>`;
+        <div class="fld"><button type="button" class="btn ghost" id="disconnect">Disconnect this browser</button></div></div>
+      <div class="card"><h2>Supply &amp; demand</h2><div class="muted" style="font-size:12px;margin-top:-6px">Same stocks and coins as above</div>
+        ${sw('zones.enabled', 'Scan for zones')}
+        <div class="fld"><div class="lbl">Crypto timeframes</div>${tfChips('zones.crypto_timeframes', ZTF)}</div>
+        <div class="fld"><div class="lbl">Stock timeframes</div>${tfChips('zones.stock_timeframes', ['8h', '1D', '1W', '2W', '3W'])}<div class="help">Stock 8h candles cover a whole regular session, like TradingView with extended hours off.</div></div>
+        ${numf('zones.keep_candles', 'Keep a touched zone listed for (candles on its timeframe)', 'Zones price is still trading in stay listed until a close through the far side.', 6)}</div>`;
     bindEditing();
   }
 
@@ -771,7 +1045,7 @@ body.show-settings #dash{display:none}body.show-settings #settings{display:block
     g.querySelectorAll('[data-num]').forEach((el) => el.onchange = () => { setp(draft, el.dataset.num, el.step === '1' ? parseInt(el.value, 10) : parseFloat(el.value)); changed(); });
     g.querySelectorAll('[data-tf]').forEach((el) => el.onclick = () => {
       const cur = new Set(getp(draft, el.dataset.tf)); cur.has(el.dataset.v) ? cur.delete(el.dataset.v) : cur.add(el.dataset.v);
-      setp(draft, el.dataset.tf, TF_ORDER.filter((t) => cur.has(t))); changed(); });
+      setp(draft, el.dataset.tf, (el.dataset.zo ? ZTF : TF_ORDER).filter((t) => cur.has(t))); changed(); });
     g.querySelectorAll('[data-rm]').forEach((el) => el.onclick = () => {
       setp(draft, el.dataset.rm, getp(draft, el.dataset.rm).filter((x) => x !== el.dataset.v)); changed(); });
     g.querySelectorAll('[data-addin]').forEach((el) => {

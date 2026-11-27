@@ -218,22 +218,21 @@ def scan_zones(frames: dict, tfs: list[str], keep: int = 6, min_wick: float = 0.
     return found
 
 
-def group_zones(zones: list[Zone]) -> list[list[Zone]]:
-    """Zones on the same side whose price ranges overlap, across timeframes."""
-    groups = []
-    for side in ("demand", "supply"):
-        zs = sorted([z for z in zones if z.side == side], key=lambda z: z.lo)
-        cur, cur_hi = [], None
-        for z in zs:
-            if cur and z.lo <= cur_hi:
-                cur.append(z)
-                cur_hi = max(cur_hi, z.hi)
-            else:
-                if cur:
-                    groups.append(cur)
-                cur, cur_hi = [z], z.hi
-        if cur:
-            groups.append(cur)
-    for g in groups:
-        g.sort(key=lambda z: -tf_rank(z.tf))
+def group_zones(zones: list[Zone], min_overlap: float = 0.5) -> list[list[Zone]]:
+    """Group zones on the same side across timeframes.  The highest-timeframe
+    zone anchors a group; a lower one joins it when at least `min_overlap` of
+    the smaller zone's height overlaps the anchor."""
+    groups: list[list[Zone]] = []
+    for z in sorted(zones, key=lambda z: (-tf_rank(z.tf), z.lo)):
+        for g in groups:
+            a = g[0]
+            if a.side != z.side:
+                continue
+            ov = min(a.hi, z.hi) - max(a.lo, z.lo)
+            small = min(a.hi - a.lo, z.hi - z.lo)
+            if ov > 0 and (small <= 0 or ov >= min_overlap * small):
+                g.append(z)
+                break
+        else:
+            groups.append([z])
     return groups

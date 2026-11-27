@@ -65,6 +65,9 @@ def test_grouping_overlaps_across_timeframes():
     d = Zone("supply", "ob", "1D", 96, 99, 0, 0, 2)
     gs = group_zones([b, a, c, d])
     assert sorted([[z.tf for z in g] for g in gs]) == [["1D"], ["1W", "1D"], ["4h"]]
+    # chained overlaps no longer merge: 1W 90-100 and 1D 99-120 overlap by 1 of 10
+    e = Zone("demand", "ob", "1D", 99, 120, 0, 0, 2)
+    assert len(group_zones([a, e])) == 2
 
 
 def test_clock_candles():
