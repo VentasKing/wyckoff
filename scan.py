@@ -192,6 +192,7 @@ def zone_cfg(cfg) -> dict:
     z.setdefault("stock_timeframes", STOCK_ZONE_TFS)
     z.setdefault("keep_candles", 6)
     z.setdefault("touch_tolerance", 0.05)
+    z.setdefault("min_imbalance_ratio", 2.0)
     return z
 
 
@@ -208,7 +209,7 @@ def zone_records(market: str, symbol: str, tv_symbol: str, frames: dict, cfg) ->
     tfs.sort(key=tf_rank)
     zones = scan_zones(frames, tfs, keep=int(zc["keep_candles"]),
                        min_wick=cfg["rules"].get("bojan_min_wick", 0.4),
-                       touch_tol=float(zc["touch_tolerance"]))
+                       touch_tol=float(zc["touch_tolerance"]), min_ratio=float(zc["min_imbalance_ratio"]))
     recs, candles = [], {}
     low_tf = tfs[0] if tfs else None
     last = frames[low_tf].iloc[-1] if low_tf else None

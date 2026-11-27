@@ -109,3 +109,12 @@ def test_qnt_18h_near_miss_counts_as_touch():
     assert z.touch == 9
     z0 = [z for z in find_zones(df, "18h") if z.lo == 141.35][0]
     assert z0.touch == 11
+
+
+def test_imbalance_candle_must_be_double_the_zone():
+    # leg 94-104 (10 high); displacement 95-112 is 17 high: < 2x -> no zone at ratio 2, zone at ratio 1.5
+    rows = UP + [(102, 104, 97, 98), (98, 99, 94, 95), (95, 112, 95, 111), (111, 118, 106, 117), (117, 120, 114, 119)]
+    assert [z for z in find_zones(frame(rows), "1D", min_ratio=2) if z.kind == "structure"] == []
+    assert [z for z in find_zones(frame(rows), "1D", min_ratio=1.5) if z.kind == "structure"]
+    big = rows[:5] + [(95, 125, 95, 124), (124, 130, 106, 129), (129, 131, 126, 130)]           # 30 high: >= 2x
+    assert [z for z in find_zones(frame(big), "1D", min_ratio=2) if z.kind == "structure"]

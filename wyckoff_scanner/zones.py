@@ -8,6 +8,8 @@ Zones (demand; supply is the mirror):
   * Order-block demand: when the candle just before the displacement candle
     did not extend a bearish leg (the structure had already turned), that
     candle, whatever its colour, wicks included.
+  * Imbalance: the displacement candle (high to low) must be at least
+    `min_ratio` times the zone's height.
   * Fresh: untouched from the fair value gap until price first trades into it.
     Only that first touch counts.  A close through the far side breaks it.
 
@@ -95,7 +97,8 @@ def _ohlc(df, mirror):
     return (-o, -l, -h, -c) if mirror else (o, h, l, c)
 
 
-def find_zones(df: pd.DataFrame, tf: str, side: str = "demand", touch_tol: float = 0.0) -> list[Zone]:
+def find_zones(df: pd.DataFrame, tf: str, side: str = "demand", touch_tol: float = 0.0,
+               min_ratio: float = 0.0) -> list[Zone]:
     mirror = side == "supply"
     o, h, l, c = _ohlc(df, mirror)
     n = len(c)
@@ -123,6 +126,8 @@ def find_zones(df: pd.DataFrame, tf: str, side: str = "demand", touch_tol: float
             continue                       # same candles as a zone already found (continuation gap)
         seen.append((first, last))
         lo, hi = float(l[first:last + 1].min()), float(h[first:last + 1].max())
+        if h[d] - l[d] < min_ratio * (hi - lo):
+            continue                       # the imbalance candle must be >= min_ratio x the zone (high to low)
         z = Zone(side, kind, tf, lo, hi, first, last, j)
         reach = hi + touch_tol * (hi - lo)      # a wick this close counts as a touch
         # first touch after the gap completed, then a close through the far side
@@ -200,7 +205,7 @@ def zone_bojans(z: Zone, frames: dict, tfs: list[str], min_wick: float = 0.4, to
 # ------------------------------------------------------------- scanning -----
 
 def scan_zones(frames: dict, tfs: list[str], keep: int = 6, min_wick: float = 0.4,
-               touch_tol: float = 0.0) -> list[Zone]:
+               touch_tol: float = 0.0, min_ratio: float = 0.0) -> list[Zone]:
     """Fresh zones whose first touch is recent (within `keep` candles of the
     zone's timeframe), or that price has stayed in since the first touch."""
     found = []
@@ -210,7 +215,7 @@ def scan_zones(frames: dict, tfs: list[str], keep: int = 6, min_wick: float = 0.
             continue
         n = len(df)
         for side in ("demand", "supply"):
-            for z in find_zones(df, tf, side, touch_tol):
+            for z in find_zones(df, tf, side, touch_tol, min_ratio):
                 if z.touch is None or z.broken is not None:
                     continue
                 # listed while the first touch is recent, or while price hasn't left the zone since

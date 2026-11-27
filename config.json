@@ -208,6 +208,7 @@
       "2W"
     ],
     "keep_candles": 6,
-    "touch_tolerance": 0.05
+    "touch_tolerance": 0.05,
+    "min_imbalance_ratio": 2
   }
 }
