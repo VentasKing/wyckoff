@@ -207,6 +207,7 @@
       "1W",
       "2W"
     ],
-    "keep_candles": 6
+    "keep_candles": 6,
+    "touch_tolerance": 0.05
   }
 }

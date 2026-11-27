@@ -95,7 +95,7 @@ def _ohlc(df, mirror):
     return (-o, -l, -h, -c) if mirror else (o, h, l, c)
 
 
-def find_zones(df: pd.DataFrame, tf: str, side: str = "demand") -> list[Zone]:
+def find_zones(df: pd.DataFrame, tf: str, side: str = "demand", touch_tol: float = 0.0) -> list[Zone]:
     mirror = side == "supply"
     o, h, l, c = _ohlc(df, mirror)
     n = len(c)
@@ -124,10 +124,11 @@ def find_zones(df: pd.DataFrame, tf: str, side: str = "demand") -> list[Zone]:
         seen.append((first, last))
         lo, hi = float(l[first:last + 1].min()), float(h[first:last + 1].max())
         z = Zone(side, kind, tf, lo, hi, first, last, j)
+        reach = hi + touch_tol * (hi - lo)      # a wick this close counts as a touch
         # first touch after the gap completed, then a close through the far side
         for x in range(j + 1, n):
             if z.touch is None:
-                if l[x] <= hi:
+                if l[x] <= reach:
                     z.touch = x
                     if c[x] < lo:
                         z.broken = x
@@ -135,7 +136,7 @@ def find_zones(df: pd.DataFrame, tf: str, side: str = "demand") -> list[Zone]:
             elif c[x] < lo:
                 z.broken = x
                 break
-            elif z.left is None and l[x] > hi:
+            elif z.left is None and l[x] > reach:
                 z.left = x
         if mirror:
             z.lo, z.hi = -hi, -lo
@@ -163,7 +164,7 @@ def _forming(o, h, l, c, min_wick, isolation=5):
     return a, b, b
 
 
-def zone_bojans(z: Zone, frames: dict, tfs: list[str], min_wick: float = 0.4) -> list[dict]:
+def zone_bojans(z: Zone, frames: dict, tfs: list[str], min_wick: float = 0.4, touch_tol: float = 0.0) -> list[dict]:
     """Bojans with a wick in the zone, on the zone's timeframe and every lower
     one in `tfs`, formed after the zone's fair value gap."""
     zdf = frames[z.tf]
@@ -173,6 +174,7 @@ def zone_bojans(z: Zone, frames: dict, tfs: list[str], min_wick: float = 0.4) ->
         return []
     mirror = z.side == "supply"
     lo, hi = (-z.hi, -z.lo) if mirror else (z.lo, z.hi)
+    hi = hi + touch_tol * (hi - lo)
     out = []
     for tf in [x for x in tfs if tf_rank(x) <= tf_rank(z.tf) and x in frames]:
         df = frames[tf]
@@ -197,7 +199,8 @@ def zone_bojans(z: Zone, frames: dict, tfs: list[str], min_wick: float = 0.4) ->
 
 # ------------------------------------------------------------- scanning -----
 
-def scan_zones(frames: dict, tfs: list[str], keep: int = 6, min_wick: float = 0.4) -> list[Zone]:
+def scan_zones(frames: dict, tfs: list[str], keep: int = 6, min_wick: float = 0.4,
+               touch_tol: float = 0.0) -> list[Zone]:
     """Fresh zones whose first touch is recent (within `keep` candles of the
     zone's timeframe), or that price has stayed in since the first touch."""
     found = []
@@ -207,13 +210,13 @@ def scan_zones(frames: dict, tfs: list[str], keep: int = 6, min_wick: float = 0.
             continue
         n = len(df)
         for side in ("demand", "supply"):
-            for z in find_zones(df, tf, side):
+            for z in find_zones(df, tf, side, touch_tol):
                 if z.touch is None or z.broken is not None:
                     continue
                 # listed while the first touch is recent, or while price hasn't left the zone since
                 if z.touch < n - keep and z.left is not None:
                     continue
-                z.bojans = zone_bojans(z, frames, tfs, min_wick)
+                z.bojans = zone_bojans(z, frames, tfs, min_wick, touch_tol)
                 found.append(z)
     return found
 

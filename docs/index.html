@@ -892,6 +892,7 @@ body.show-settings #zonesview{display:none}
     n(c.rules.bojan_timeframes_below ?? 2, 0, 6, 'Bojan timeframes below');
     { const v = c.rules.tap3_zone_tolerance ?? 0.05; if (!(typeof v === 'number' && v >= 0 && v <= 1)) errs.push('Order block tolerance must be a number from 0 to 1.'); }
     if (c.zones) n(c.zones.keep_candles, 1, 500, 'Zone keep candles');
+    if (c.zones && !(typeof (c.zones.touch_tolerance ?? 0.05) === 'number' && (c.zones.touch_tolerance ?? 0.05) >= 0 && (c.zones.touch_tolerance ?? 0.05) <= 1)) errs.push('Touch tolerance must be between 0 and 1.');
     { const v = c.rules.min_tap3_spacing ?? 0.25; if (!(typeof v === 'number' && v >= 0 && v <= 2)) errs.push('Tap 3 spacing must be a number from 0 to 2.'); }
     n(c.alerts.max_bars_ago, 0, 100, 'Alert window');
     n(c.display.history_days, 1, 60, 'History days');
@@ -990,7 +991,7 @@ body.show-settings #zonesview{display:none}
       <div class="card"><h2>Crypto</h2>${kv('Scanning', c.crypto.enabled ? esc(c.crypto.universe) : 'Off')}${kv('Timeframes', esc(c.crypto.timeframes.join(' · ')))}
         <div class="muted" style="font-size:12px;margin-top:8px">My list · ${c.crypto.products.length} coins</div>${tags(c.crypto.products)}</div>
       <div class="card"><h2>Model rules</h2>${kv('Tap 2 is complete when price…', esc(T2[c.rules.tap2_return] || c.rules.tap2_return))}${kv('Require the AR to break structure', yes(c.rules.require_ar_break_of_structure))}${kv('Allow ranges inside larger ranges', yes(c.rules.allow_nested_ranges))}${kv('Tap 1 must close beyond every close of the last', (c.rules.trend_lookback ?? 50) + ' candles')}${kv('Deviations of the other end allowed', c.rules.max_opposite_deviations ?? 1)}${kv('Tap 2 → tap 3 must take at least', Math.round((c.rules.min_tap3_spacing ?? 0.25) * 100) + '% of tap 1 → tap 2')}</div>
-      ${c.zones ? `<div class="card"><h2>Supply &amp; demand</h2>${kv('Scanning', yes(c.zones.enabled))}${kv('Crypto timeframes', esc(c.zones.crypto_timeframes.join(' · ')))}${kv('Stock timeframes', esc(c.zones.stock_timeframes.join(' · ')))}${kv('Keep a touched zone listed for', c.zones.keep_candles + ' candles')}${kv('Alert: zone first touched', yes(c.alerts.zone_hit ?? true))}${kv('Alert: Bojan in a zone', yes(c.alerts.zone_bojan ?? true))}</div>` : ''}
+      ${c.zones ? `<div class="card"><h2>Supply &amp; demand</h2>${kv('Scanning', yes(c.zones.enabled))}${kv('Crypto timeframes', esc(c.zones.crypto_timeframes.join(' · ')))}${kv('Stock timeframes', esc(c.zones.stock_timeframes.join(' · ')))}${kv('Keep a touched zone listed for', c.zones.keep_candles + ' candles')}${kv('Counts as a touch within', Math.round((c.zones.touch_tolerance ?? 0.05) * 100) + '% of the zone height')}${kv('Alert: zone first touched', yes(c.alerts.zone_hit ?? true))}${kv('Alert: Bojan in a zone', yes(c.alerts.zone_bojan ?? true))}</div>` : ''}
       <div class="card"><h2>Phone alerts</h2>${kv('Tap 3 potential', yes(c.alerts.tap3_potential))}${kv('Tap 3 confirmed', yes(c.alerts.tap3_confirmed))}${kv('Model 1 forming', yes(c.alerts.model1_forming))}${kv('Only taps from the last', c.alerts.max_bars_ago + ' bars')}${kv('Time zone', esc(c.display.timezone))}</div>`;
   }
 
@@ -1014,7 +1015,7 @@ body.show-settings #zonesview{display:none}
     d.rules.tap3_zone_tolerance = d.rules.tap3_zone_tolerance ?? 0.05;
     d.rules.bojan_min_wick = d.rules.bojan_min_wick ?? 0.4;
     d.rules.bojan_timeframes_below = d.rules.bojan_timeframes_below ?? 2;
-    d.zones = Object.assign({ enabled: true, crypto_timeframes: ZTF.slice(), stock_timeframes: ['8h', '1D', '1W', '2W'], keep_candles: 6 }, d.zones || {});
+    d.zones = Object.assign({ enabled: true, crypto_timeframes: ZTF.slice(), stock_timeframes: ['8h', '1D', '1W', '2W'], keep_candles: 6, touch_tolerance: 0.05 }, d.zones || {});
     d.alerts.zone_hit = d.alerts.zone_hit ?? true;
     d.alerts.zone_bojan = d.alerts.zone_bojan ?? true;
     g.innerHTML = `
@@ -1055,7 +1056,8 @@ body.show-settings #zonesview{display:none}
         ${sw('zones.enabled', 'Scan for zones')}
         <div class="fld"><div class="lbl">Crypto timeframes</div>${tfChips('zones.crypto_timeframes', ZTF)}</div>
         <div class="fld"><div class="lbl">Stock timeframes</div>${tfChips('zones.stock_timeframes', ['8h', '1D', '1W', '2W', '3W'])}<div class="help">Stock 8h candles cover a whole regular session, like TradingView with extended hours off.</div></div>
-        ${numf('zones.keep_candles', 'Keep a touched zone listed for (candles on its timeframe)', 'Zones price is still trading in stay listed until a close through the far side.', 6)}</div>`;
+        ${numf('zones.keep_candles', 'Keep a touched zone listed for (candles on its timeframe)', 'Zones price is still trading in stay listed until a close through the far side.', 6)}
+        ${numf('zones.touch_tolerance', 'A wick this close counts as a touch (share of the zone’s height)', '0.05 = within 5% of the zone’s height. Also used for Bojan wicks touching a zone. 0 = must trade into it.', 0.05, 0.01)}</div>`;
     bindEditing();
   }
 

@@ -191,6 +191,7 @@ def zone_cfg(cfg) -> dict:
     z.setdefault("crypto_timeframes", CRYPTO_ZONE_TFS)
     z.setdefault("stock_timeframes", STOCK_ZONE_TFS)
     z.setdefault("keep_candles", 6)
+    z.setdefault("touch_tolerance", 0.05)
     return z
 
 
@@ -206,7 +207,8 @@ def zone_records(market: str, symbol: str, tv_symbol: str, frames: dict, cfg) ->
     tfs = [t for t in (zc["crypto_timeframes"] if market == "crypto" else zc["stock_timeframes"]) if t in frames]
     tfs.sort(key=tf_rank)
     zones = scan_zones(frames, tfs, keep=int(zc["keep_candles"]),
-                       min_wick=cfg["rules"].get("bojan_min_wick", 0.4))
+                       min_wick=cfg["rules"].get("bojan_min_wick", 0.4),
+                       touch_tol=float(zc["touch_tolerance"]))
     recs, candles = [], {}
     low_tf = tfs[0] if tfs else None
     last = frames[low_tf].iloc[-1] if low_tf else None

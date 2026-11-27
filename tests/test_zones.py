@@ -96,3 +96,16 @@ def test_zone_left_and_retouched_is_not_listed():
                  (108, 116, 105, 115)] + [(115, 120, 110, 118)] * 8 + [(118, 118, 101, 103)]   # left, came back
     assert scan_zones({"1D": frame(rows)}, ["1D"], keep=3) == []
     assert scan_zones({"1D": frame(rows[:10])}, ["1D"], keep=3)      # recent first touch is listed
+
+
+def test_qnt_18h_near_miss_counts_as_touch():
+    """QNT-USD 18h: OB 141.35-143.62; a wick to 143.70 two candles later is the first touch."""
+    rows = [(150, 152.5, 147.2, 149.5), (149.5, 149.8, 134.8, 136.5), (136.5, 140.7, 133.9, 138.9),
+            (138.8, 143.7, 126.8, 142.7), (142.7, 144.1, 140.6, 143.2), (143.2, 144.0, 137.3, 142.8),
+            (142.81, 143.62, 141.35, 143.47), (143.56, 172.9, 139.85, 161.74), (161.8, 162.8, 153.53, 153.89),
+            (153.98, 156.63, 143.70, 146.87), (146.97, 148.5, 143.86, 146.97), (146.62, 147.1, 135.0, 143.04)]
+    df = frame(rows, freq="18h")
+    z = [z for z in find_zones(df, "18h", touch_tol=0.05) if z.lo == 141.35][0]
+    assert z.touch == 9
+    z0 = [z for z in find_zones(df, "18h") if z.lo == 141.35][0]
+    assert z0.touch == 11

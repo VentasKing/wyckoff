@@ -100,5 +100,6 @@ Switch tabs at the top of the dashboard. Same stocks and coins as the Wyckoff sc
 |---|---|
 | `zones.enabled` | scan for zones |
 | `zones.crypto_timeframes`, `zones.stock_timeframes` | timeframes to look for zones on |
+| `zones.touch_tolerance` | a wick within this share of the zone's height counts as a touch (default 0.05); also used for Bojan wicks |
 | `zones.keep_candles` | how long a touched zone stays listed (candles on its timeframe) |
 | `alerts.zone_hit`, `alerts.zone_bojan` | phone alerts for a first touch and for a Bojan formed in a zone |
