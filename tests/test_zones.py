@@ -24,9 +24,9 @@ def test_structure_demand_is_the_whole_leg():
 def test_order_block_when_structure_turned_first():
     # down 2, then 2 candles up (new structure), then the displacement
     rows = UP + [(102, 104, 97, 98), (98, 99, 94, 95), (95, 98, 95, 97), (97, 99.5, 96, 99),
-                 (99, 112, 98.5, 111), (111, 118, 106, 117), (117, 120, 114, 119)]
+                 (99, 112, 97.5, 111), (111, 118, 106, 117), (117, 120, 114, 119)]
     zs = find_zones(frame(rows), "1D")
-    assert [z.kind for z in zs] == ["ob"] and (zs[0].lo, zs[0].hi) == (94, 99)
+    assert [z.kind for z in zs] == ["ob"] and (zs[0].lo, zs[0].hi) == (96, 99.5)   # the candle before the big one
 
 
 def test_first_touch_only_and_break():
@@ -74,3 +74,25 @@ def test_clock_candles():
     h = frame([(1, 2, 0, 1)] * 48, freq="1h")
     assert list(resample_clock(h, "18h").index.hour[:3]) == [0, 18, 0]
     assert len(resample_clock(h, "5h")) == 10
+
+
+def test_eth_3w_order_block_is_the_candle_before_the_big_one():
+    """ETH-USD 3W, Nov 2026: red Jun 1, green Jun 22, green Jul 13, big green Aug 3.
+    The OB is Jul 13 (1748-1979), not the red Jun 1 candle; it closed through
+    on Nov 16, so it isn't listed."""
+    import json, pathlib
+    rows = json.loads((pathlib.Path(__file__).parent / "data" / "eth_3w_2026-11-26.json").read_text())
+    df = pd.DataFrame([r[1:] for r in rows], columns=["open", "high", "low", "close"],
+                      index=pd.to_datetime([r[0] for r in rows], unit="s", utc=True))
+    zs = [z for z in find_zones(df, "3W") if df.index[z.first] >= pd.Timestamp("2026-06-01", tz="UTC")]
+    assert [(z.kind, z.lo, z.hi) for z in zs][:1] == [("ob", 1748.05, 1979.0)]
+    assert zs[0].broken is not None
+    assert not [z for z in scan_zones({"3W": df}, ["3W"]) if z.lo == 1505.0]
+
+
+def test_zone_left_and_retouched_is_not_listed():
+    rows = UP + [(102, 104, 97, 98), (98, 99, 94, 95), (95, 112, 95, 111), (111, 118, 106, 117),
+                 (117, 120, 114, 119), (119, 119, 103, 108),   # first touch
+                 (108, 116, 105, 115)] + [(115, 120, 110, 118)] * 8 + [(118, 118, 101, 103)]   # left, came back
+    assert scan_zones({"1D": frame(rows)}, ["1D"], keep=3) == []
+    assert scan_zones({"1D": frame(rows[:10])}, ["1D"], keep=3)      # recent first touch is listed

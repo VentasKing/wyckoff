@@ -6,8 +6,8 @@ Zones (demand; supply is the mirror):
     the one before) that runs straight into a bullish candle leaving a fair
     value gap.  The zone is every candle of that leg, wicks included.
   * Order-block demand: when the candle just before the displacement candle
-    did not extend a bearish leg (the structure had already turned), the last
-    bearish candle before the displacement, wicks included.
+    did not extend a bearish leg (the structure had already turned), that
+    candle, whatever its colour, wicks included.
   * Fresh: untouched from the fair value gap until price first trades into it.
     Only that first touch counts.  A close through the far side breaks it.
 
@@ -86,6 +86,7 @@ class Zone:
     fvg: int                  # candle that completed the fair value gap
     touch: int | None = None  # first candle that traded into it
     broken: int | None = None # first close through the far side (after the touch)
+    left: int | None = None   # first candle entirely outside the zone after the touch
     bojans: list = field(default_factory=list)
 
 
@@ -94,7 +95,7 @@ def _ohlc(df, mirror):
     return (-o, -l, -h, -c) if mirror else (o, h, l, c)
 
 
-def find_zones(df: pd.DataFrame, tf: str, side: str = "demand", ob_lookback: int = 10) -> list[Zone]:
+def find_zones(df: pd.DataFrame, tf: str, side: str = "demand") -> list[Zone]:
     mirror = side == "supply"
     o, h, l, c = _ohlc(df, mirror)
     n = len(c)
@@ -105,6 +106,8 @@ def find_zones(df: pd.DataFrame, tf: str, side: str = "demand", ob_lookback: int
         d = j - 1                          # displacement candle
         if not c[d] > o[d]:
             continue
+        if j >= 3 and l[j - 1] > h[j - 3]:
+            continue                       # a second gap in the same move: the zone is before the first
         p = d - 1
         k = p
         while k - 1 >= 0 and l[k] < l[k - 1]:
@@ -113,13 +116,9 @@ def find_zones(df: pd.DataFrame, tf: str, side: str = "demand", ob_lookback: int
         if p > k and l[j] > h[k:p + 1].max():   # >= 2 candles of bearish structure, gap above all of it
             first, last, kind = k, p, "structure"
         else:
-            ob = next((x for x in range(p, max(-1, p - ob_lookback), -1) if c[x] < o[x]), None)
-            if ob is None:
-                continue
-            first = last = ob
+            # structure had already turned: the candle right before the big one is the order block
+            first = last = p
             kind = "ob"
-            if h[ob] >= l[j]:
-                continue                   # the gap must sit above the order block
         if any(a <= first and last <= b for a, b in seen):
             continue                       # same candles as a zone already found (continuation gap)
         seen.append((first, last))
@@ -136,6 +135,8 @@ def find_zones(df: pd.DataFrame, tf: str, side: str = "demand", ob_lookback: int
             elif c[x] < lo:
                 z.broken = x
                 break
+            elif z.left is None and l[x] > hi:
+                z.left = x
         if mirror:
             z.lo, z.hi = -hi, -lo
         out.append(z)
@@ -198,20 +199,19 @@ def zone_bojans(z: Zone, frames: dict, tfs: list[str], min_wick: float = 0.4) ->
 
 def scan_zones(frames: dict, tfs: list[str], keep: int = 6, min_wick: float = 0.4) -> list[Zone]:
     """Fresh zones whose first touch is recent (within `keep` candles of the
-    zone's timeframe) or that price is still trading in, unbroken."""
+    zone's timeframe), or that price has stayed in since the first touch."""
     found = []
     for tf in tfs:
         df = frames.get(tf)
         if df is None or len(df) < 5:
             continue
         n = len(df)
-        last_h, last_l = float(df["high"].iloc[-1]), float(df["low"].iloc[-1])
         for side in ("demand", "supply"):
             for z in find_zones(df, tf, side):
                 if z.touch is None or z.broken is not None:
                     continue
-                in_zone = last_l <= z.hi and last_h >= z.lo
-                if z.touch < n - keep and not in_zone:
+                # listed while the first touch is recent, or while price hasn't left the zone since
+                if z.touch < n - keep and z.left is not None:
                     continue
                 z.bojans = zone_bojans(z, frames, tfs, min_wick)
                 found.append(z)
