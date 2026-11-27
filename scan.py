@@ -223,7 +223,9 @@ def zone_records(market: str, symbol: str, tv_symbol: str, frames: dict, cfg) ->
                        "touch": iso(t[z.touch]), "touch_bars_ago": int(len(t) - 1 - z.touch),
                        "tv": tv_link(tv_symbol, z.tf)})
             for b in z.bojans:
+                bi = frames[b["tf"]].index
                 bojans.append({"zone_tf": z.tf, "tf": b["tf"], "state": b["state"], "start": iso(b["start"]),
+                               "bars_ago": int(len(bi) - 1 - bi.get_loc(b["end"])),
                                "end": iso(b["end"]), "time": iso(b["time"]), "price": rnd(b["price"]),
                                "candles": b["candles"], "tv": tv_link(tv_symbol, b["tf"])})
         # one Bojan per (tf, start): keep it under its highest zone
@@ -484,14 +486,17 @@ def push_alerts(signals, cfg, topic, opener=None) -> int:
 
 
 def zone_alert_events(zones: list[dict], cfg) -> list[tuple[str, dict, str]]:
+    """Only what just happened: a first touch on the newest or previous candle
+    of the zone's timeframe, a Bojan that completed on the newest or previous
+    candle of its timeframe."""
     a = cfg["alerts"]
     out = []
     for g in zones:
         for z in g["zones"]:
-            if a.get("zone_hit", True):
+            if a.get("zone_hit", True) and z.get("touch_bars_ago", 0) <= 1:
                 out.append((f"zone|{g['symbol']}|{g['side']}|{z['tf']}|{z['start']}|hit", g, f"{z['tf']} {g['side']} hit"))
         for b in g["bojans"]:
-            if b["state"] == "formed" and a.get("zone_bojan", True):
+            if b["state"] == "formed" and a.get("zone_bojan", True) and b.get("bars_ago", 0) <= 1:
                 out.append((f"zone|{g['symbol']}|{g['side']}|bojan|{b['tf']}|{b['start']}", g,
                             f"Bojan {'low' if g['side'] == 'demand' else 'high'} on the {b['tf']}"))
     return out
@@ -519,18 +524,33 @@ def push_zone_alerts(zones, cfg, topic, opener=None) -> int:
     topic = clean_topic(topic)
     seen = set(json.loads(PUSHED.read_text())) if PUSHED.exists() else set()
     seed = not any(k.startswith("zone|") for k in seen)      # first zone scan: record, don't flood
-    sent = 0
-    for key, g, what in zone_alert_events(zones, cfg):
-        if key in seen:
+    cap = int(cfg["alerts"].get("zone_max_per_scan", 8))
+    sent, extra, stop = 0, [], False
+    new = [(k, g, w) for k, g, w in zone_alert_events(zones, cfg) if k not in seen]
+    for key, g, what in new:
+        seen.add(key)                       # never retried: a missed zone alert is better than a flood
+        if seed or not topic or stop:
             continue
-        if not seed and topic:
-            try:
-                send_zone_ntfy(topic, g, what, opener=opener)
-                sent += 1
-            except Exception as e:  # noqa: BLE001
-                print(f"  zone push failed for {g['symbol']}: {e}")
-                continue
-        seen.add(key)
+        if sent >= cap:
+            extra.append(g["symbol"])
+            continue
+        try:
+            send_zone_ntfy(topic, g, what, opener=opener)
+            sent += 1
+        except Exception as e:  # noqa: BLE001
+            print(f"  zone push failed for {g['symbol']}: {e}")
+            stop = "429" in str(e)
+    if extra and topic and not stop:
+        try:
+            names = ", ".join(dict.fromkeys(extra))
+            req = urllib.request.Request(f"https://ntfy.sh/{topic}", method="POST",
+                                         data=f"{len(extra)} more zone alerts: {names}".encode(),
+                                         headers={"Title": "More supply & demand hits", "Tags": "bell",
+                                                  "Click": (dashboard_url() + "#zones") if dashboard_url() else ""})
+            (opener or urllib.request.urlopen)(req, timeout=20)
+            sent += 1
+        except Exception as e:  # noqa: BLE001
+            print(f"  zone summary push failed: {e}")
     if seed:
         seen.add("zone|seeded")
     PUSHED.parent.mkdir(parents=True, exist_ok=True)

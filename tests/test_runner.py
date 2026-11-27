@@ -133,3 +133,19 @@ def test_explain_reports_candidates_and_reasons(capsys):
     txt = capsys.readouterr().out
     assert "range confirmed" in txt and "deviated 2 times" in txt
     assert "trend rule" in txt and "pullback, not the end of the trend" in txt
+
+
+def test_zone_alerts_are_capped_and_only_fresh(tmp_path, monkeypatch):
+    monkeypatch.setattr(scan, "PUSHED", tmp_path / "pushed.json")
+    (tmp_path / "pushed.json").write_text(json.dumps(["zone|seeded"]))
+    cfg = {"alerts": {"zone_hit": True, "zone_bojan": True}}
+    def g(i, ago):
+        return {"id": f"g{i}", "symbol": f"S{i}", "side": "demand", "tfs": ["1D"], "lo": 1, "hi": 2, "price": 1.5,
+                "state": "in zone", "tv": "x", "bojans": [],
+                "zones": [{"tf": "1D", "kind": "ob", "lo": 1, "hi": 2, "start": f"2026-01-{i:02d}", "touch_bars_ago": ago}]}
+    zones = [g(i, 0) for i in range(1, 21)] + [g(i, 5) for i in range(21, 25)]   # 20 fresh, 4 old
+    sent = []
+    n = scan.push_zone_alerts(zones, cfg, "topic", opener=lambda req, timeout: sent.append(req))
+    assert n == 9 and len(sent) == 9                     # 8 + one summary
+    assert "12 more" in sent[-1].data.decode()
+    assert scan.push_zone_alerts(zones, cfg, "topic", opener=lambda req, timeout: sent.append(req)) == 0
