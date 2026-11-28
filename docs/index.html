@@ -648,7 +648,7 @@ body.show-settings #zonesview{display:none}
     const d = $('#zdetail'), g = zsel;
     if (!g) { d.innerHTML = ZDATA.generated_at ? '<div class="card empty">Pick a zone to see its chart.</div>' : ''; return; }
     const dem = g.side === 'demand';
-    const kindName = (k) => (k === 'structure' ? 'Structure ' + (dem ? 'demand' : 'supply') : 'Order block');
+    const kindName = (k, via) => (k === 'structure' ? 'Structure ' + (dem ? 'demand' : 'supply') : 'Order block') + (via === 'gap' ? ' + price gap' : '');
     d.innerHTML = `
       <div class="card">
         <button type="button" class="back" id="zbackbtn">‹ Zones</button>
@@ -683,7 +683,7 @@ body.show-settings #zonesview{display:none}
       </div>
       <div class="card"><h2>Zones in this group</h2>
         <table class="zt"><thead><tr><th>TF</th><th>Type</th><th>Range</th><th>Imbalance</th><th>Formed</th><th>First touch</th><th></th></tr></thead><tbody>
-        ${g.zones.map((z) => `<tr><td><span class="tf">${esc(z.tf)}</span></td><td>${esc(kindName(z.kind))}</td><td class="mono">${num(z.lo)} – ${num(z.hi)}</td><td class="mono">${z.ratio != null ? z.ratio.toFixed(1) + '×' : '–'}</td>
+        ${g.zones.map((z) => `<tr><td><span class="tf">${esc(z.tf)}</span></td><td>${esc(kindName(z.kind, z.via))}</td><td class="mono">${num(z.lo)} – ${num(z.hi)}</td><td class="mono">${z.ratio != null ? z.ratio.toFixed(1) + '×' : '–'}</td>
           <td>${esc(when(z.start))}${z.end !== z.start ? ' → ' + esc(when(z.end)) : ''}<div class="muted" style="font-size:12px">gap completed ${esc(when(z.fvg))}</div></td>
           <td>${z.touch ? `${esc(when(z.touch))}<div class="muted" style="font-size:12px">${z.touch_bars_ago === 0 ? 'this candle' : z.touch_bars_ago + ' candle' + (z.touch_bars_ago === 1 ? '' : 's') + ' ago'}</div>` : '<span class="muted">Untouched</span>'}</td>
           <td><a href="${esc(z.tv)}" target="_blank" rel="noopener">${esc(z.tf)} chart ↗</a></td></tr>`).join('')}
@@ -747,7 +747,7 @@ body.show-settings #zonesview{display:none}
     // zones as transparent boxes from the OB / leg to the right edge, like TradingView rectangles
     const mine = g.zones.filter((z) => z.tf === zchartTf);
     const tsec = (iso) => Math.floor(new Date(iso) / 1000);
-    const boxes = mine.map((z) => ({ t: tsec(z.start), lo: z.lo, hi: z.hi, cls: '', label: `${z.tf} ${z.kind === 'structure' ? 'structure ' + (dem ? 'demand' : 'supply') : 'OB'}` }));
+    const boxes = mine.map((z) => ({ t: tsec(z.start), lo: z.lo, hi: z.hi, cls: '', label: `${z.tf} ${z.kind === 'structure' ? 'structure ' + (dem ? 'demand' : 'supply') : 'OB'}${z.via === 'gap' ? ' · gap' : ''}` }));
     if (g.zones.length > mine.length && !mine.some((z) => z.lo === g.lo && z.hi === g.hi))
       boxes.unshift({ t: Math.min(...g.zones.map((z) => tsec(z.start))), lo: g.lo, hi: g.hi, cls: ' span', label: mine.length ? '' : 'zone group (' + g.tfs.join(' · ') + ')' });
     const ov = document.createElement('div'); ov.className = 'zov' + (dem ? '' : ' sup'); el.appendChild(ov);
@@ -1014,7 +1014,7 @@ body.show-settings #zonesview{display:none}
       <div class="card"><h2>Crypto</h2>${kv('Scanning', c.crypto.enabled ? esc(c.crypto.universe) : 'Off')}${kv('Timeframes', esc(c.crypto.timeframes.join(' · ')))}
         <div class="muted" style="font-size:12px;margin-top:8px">My list · ${c.crypto.products.length} coins</div>${tags(c.crypto.products)}</div>
       <div class="card"><h2>Model rules</h2>${kv('Tap 2 is complete when price…', esc(T2[c.rules.tap2_return] || c.rules.tap2_return))}${kv('Require the AR to break structure', yes(c.rules.require_ar_break_of_structure))}${kv('Allow ranges inside larger ranges', yes(c.rules.allow_nested_ranges))}${kv('Tap 1 must close beyond every close of the last', (c.rules.trend_lookback ?? 50) + ' candles')}${kv('Deviations of the other end allowed', c.rules.max_opposite_deviations ?? 1)}${kv('Tap 2 → tap 3 must take at least', Math.round((c.rules.min_tap3_spacing ?? 0.25) * 100) + '% of tap 1 → tap 2')}</div>
-      ${c.zones ? `<div class="card"><h2>Supply &amp; demand</h2>${kv('Scanning', yes(c.zones.enabled))}${kv('Crypto timeframes', esc(c.zones.crypto_timeframes.join(' · ')))}${kv('Stock timeframes', esc(c.zones.stock_timeframes.join(' · ')))}${kv('Keep a touched zone listed for', c.zones.keep_candles + ' candles')}${kv('Imbalance candle at least', (c.zones.min_imbalance_ratio ?? 2) + '× the zone')}${kv('Oldest zone', (c.zones.max_age_candles || 0) ? c.zones.max_age_candles + ' candles' : 'any age')}${kv('Crypto hour-timeframe history', (c.zones.crypto_hourly_days ?? 365) + ' days')}${kv('Counts as a touch within', Math.round((c.zones.touch_tolerance ?? 0.05) * 100) + '% of the zone height')}${kv('Alert: zone first touched', yes(c.alerts.zone_hit ?? true))}${kv('Alert: Bojan in a zone', yes(c.alerts.zone_bojan ?? true))}</div>` : ''}
+      ${c.zones ? `<div class="card"><h2>Supply &amp; demand</h2>${kv('Scanning', yes(c.zones.enabled))}${kv('Crypto timeframes', esc(c.zones.crypto_timeframes.join(' · ')))}${kv('Stock timeframes', esc(c.zones.stock_timeframes.join(' · ')))}${kv('Keep a touched zone listed for', c.zones.keep_candles + ' candles')}${kv('Imbalance candle at least', (c.zones.min_imbalance_ratio ?? 2) + '× the zone')}${kv('Stock price gaps count', yes(c.zones.stock_gaps ?? true))}${kv('Oldest zone', (c.zones.max_age_candles || 0) ? c.zones.max_age_candles + ' candles' : 'any age')}${kv('Crypto hour-timeframe history', (c.zones.crypto_hourly_days ?? 365) + ' days')}${kv('Counts as a touch within', Math.round((c.zones.touch_tolerance ?? 0.05) * 100) + '% of the zone height')}${kv('Alert: zone first touched', yes(c.alerts.zone_hit ?? true))}${kv('Alert: Bojan in a zone', yes(c.alerts.zone_bojan ?? true))}</div>` : ''}
       ${c.zones && c.zones.watch ? `<div class="card"><h2>Watching list</h2>${kv('Listing untouched zones', yes(c.zones.watch.enabled))}${kv('Crypto timeframes', esc(c.zones.watch.crypto_timeframes.join(' · ')))}${kv('Stock timeframes', esc(c.zones.watch.stock_timeframes.join(' · ')))}${kv('Imbalance candle at least', c.zones.watch.min_imbalance_ratio + '× the zone')}${kv('Within', c.zones.watch.max_distance_pct + '% of price')}${kv('Structure zones', yes(c.zones.watch.structure))}${kv('Order blocks', yes(c.zones.watch.order_blocks))}</div>` : ''}
       <div class="card"><h2>Phone alerts</h2>${kv('Tap 3 potential', yes(c.alerts.tap3_potential))}${kv('Tap 3 confirmed', yes(c.alerts.tap3_confirmed))}${kv('Model 1 forming', yes(c.alerts.model1_forming))}${kv('Only taps from the last', c.alerts.max_bars_ago + ' bars')}${kv('Time zone', esc(c.display.timezone))}</div>`;
   }
@@ -1039,7 +1039,7 @@ body.show-settings #zonesview{display:none}
     d.rules.tap3_zone_tolerance = d.rules.tap3_zone_tolerance ?? 0.05;
     d.rules.bojan_min_wick = d.rules.bojan_min_wick ?? 0.4;
     d.rules.bojan_timeframes_below = d.rules.bojan_timeframes_below ?? 2;
-    d.zones = Object.assign({ enabled: true, crypto_timeframes: ZTF.slice(), stock_timeframes: ['8h', '1D', '1W', '2W'], keep_candles: 6, touch_tolerance: 0.05, min_imbalance_ratio: 2, max_age_candles: 0, crypto_hourly_days: 365 }, d.zones || {});
+    d.zones = Object.assign({ enabled: true, crypto_timeframes: ZTF.slice(), stock_timeframes: ['8h', '1D', '1W', '2W'], keep_candles: 6, touch_tolerance: 0.05, min_imbalance_ratio: 2, max_age_candles: 0, crypto_hourly_days: 365, stock_gaps: true }, d.zones || {});
     d.zones.watch = Object.assign({ enabled: true, crypto_timeframes: d.zones.crypto_timeframes.slice(), stock_timeframes: d.zones.stock_timeframes.slice(),
       min_imbalance_ratio: 3, max_distance_pct: 50, structure: true, order_blocks: true }, d.zones.watch || {});
     d.alerts.zone_hit = d.alerts.zone_hit ?? true;
@@ -1084,6 +1084,7 @@ body.show-settings #zonesview{display:none}
         <div class="fld"><div class="lbl">Stock timeframes</div>${tfChips('zones.stock_timeframes', ['8h', '1D', '1W', '2W', '3W'])}<div class="help">Stock 8h candles cover a whole regular session, like TradingView with extended hours off.</div></div>
         ${numf('zones.keep_candles', 'Keep a touched zone listed for (candles on its timeframe)', 'Zones price is still trading in stay listed until a close through the far side.', 6)}
         ${numf('zones.min_imbalance_ratio', 'Imbalance candle must be at least (× the zone’s size)', 'The candle that leaves the fair value gap, high to low, compared with the order block or structure leg, high to low. 2 = at least double. 0 = any gap counts.', 2, 0.5)}
+        ${sw('zones.stock_gaps', 'Stocks: price gaps count as imbalance', 'The candle or structure leg before a gap up (down for supply) becomes a zone. Imbalance is measured from the zone’s edge to the gap candle’s far end.')}
         ${numf('zones.max_age_candles', 'Oldest zone to consider (candles on its timeframe)', 'Applies to both lists. 0 = any age, as long as the zone is still fresh.', 0)}
         ${numf('zones.crypto_hourly_days', 'Crypto history for the hour timeframes (days)', 'How far back 4h–18h zones can come from. 365 = a year. More days make scans slower.', 365)}
         ${numf('zones.touch_tolerance', 'A wick this close counts as a touch (share of the zone’s height)', '0.05 = within 5% of the zone’s height. Also used for Bojan wicks touching a zone. 0 = must trade into it.', 0.05, 0.01)}</div>

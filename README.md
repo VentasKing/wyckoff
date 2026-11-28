@@ -101,6 +101,7 @@ Switch tabs at the top of the dashboard. Same stocks and coins as the Wyckoff sc
 | `zones.enabled` | scan for zones |
 | `zones.crypto_timeframes`, `zones.stock_timeframes` | timeframes to look for zones on |
 | `zones.min_imbalance_ratio` | the candle that leaves the gap (high to low) must be at least this many times the zone's height (default 2) |
+| `zones.stock_gaps` | stocks: a price gap (a candle opening entirely past the one before) counts like a fair value gap; the imbalance is measured from the zone's edge to the gap candle's far end (default on) |
 | `zones.max_age_candles` | oldest zone considered, in candles of its timeframe, for both lists (default 0 = any age while fresh) |
 | `zones.crypto_hourly_days` | days of hourly crypto history behind the 4h–18h zones (default 365) |
 | `zones.touch_tolerance` | a wick within this share of the zone's height counts as a touch (default 0.05); also used for Bojan wicks |

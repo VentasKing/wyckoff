@@ -91,6 +91,7 @@ class Zone:
     left: int | None = None   # first candle entirely outside the zone after the touch
     ratio: float = 0.0        # imbalance candle (high-low) / zone height
     distance: float | None = None   # untouched zones: % from the last close to the zone
+    via: str = "fvg"          # fvg | gap (price gap, stocks)
     bojans: list = field(default_factory=list)
 
 
@@ -100,11 +101,14 @@ def _ohlc(df, mirror):
 
 
 def find_zones(df: pd.DataFrame, tf: str, side: str = "demand", touch_tol: float = 0.0,
-               min_ratio: float = 0.0) -> list[Zone]:
+               min_ratio: float = 0.0, gaps: bool = False) -> list[Zone]:
+    """Zones from fair value gaps, and (gaps=True, for stocks) from price gaps:
+    a candle opening entirely above the one before it.  For a price gap the
+    imbalance is measured from the zone's top to the gap candle's high."""
     mirror = side == "supply"
     o, h, l, c = _ohlc(df, mirror)
     n = len(c)
-    out, seen = [], []
+    cands = []                             # (completed at, candle before the move, low above the zone, imbalance size, via)
     for j in range(2, n):
         if not l[j] > h[j - 2]:
             continue                       # no bullish fair value gap
@@ -113,25 +117,35 @@ def find_zones(df: pd.DataFrame, tf: str, side: str = "demand", touch_tol: float
             continue
         if j >= 3 and l[j - 1] > h[j - 3]:
             continue                       # a second gap in the same move: the zone is before the first
-        p = d - 1
+        cands.append((j, d - 1, l[j], h[d] - l[d], "fvg"))
+    if gaps:
+        for q in range(1, n):
+            if l[q] > h[q - 1]:
+                cands.append((q, q - 1, l[q], None, "gap"))
+    cands.sort(key=lambda x: (x[0], x[4] != "fvg"))
+    out, seen = [], []
+    for j, p, above, imb, via in cands:
         k = p
         while k - 1 >= 0 and l[k] < l[k - 1]:
             k -= 1
         k += int(np.argmax(h[k:p + 1]))   # the leg starts at its swing high
-        if p > k and l[j] > h[k:p + 1].max():   # >= 2 candles of bearish structure, gap above all of it
+        if p > k and above > h[k:p + 1].max():   # >= 2 candles of bearish structure, gap above all of it
             first, last, kind = k, p, "structure"
         else:
-            # structure had already turned: the candle right before the big one is the order block
+            # structure had already turned: the candle right before the move is the order block
             first = last = p
             kind = "ob"
         if any(a <= first and last <= b for a, b in seen):
             continue                       # same candles as a zone already found (continuation gap)
-        seen.append((first, last))
         lo, hi = float(l[first:last + 1].min()), float(h[first:last + 1].max())
-        if h[d] - l[d] < min_ratio * (hi - lo):
-            continue                       # the imbalance candle must be >= min_ratio x the zone (high to low)
+        if imb is None:
+            imb = h[j] - hi                # price gap: zone top to the gap candle's high
+        if imb < min_ratio * (hi - lo):
+            continue                       # the imbalance must be >= min_ratio x the zone (high to low)
+        seen.append((first, last))
         z = Zone(side, kind, tf, lo, hi, first, last, j)
-        z.ratio = float((h[d] - l[d]) / (hi - lo)) if hi > lo else float("inf")
+        z.via = via
+        z.ratio = float(imb / (hi - lo)) if hi > lo else float("inf")
         reach = hi + touch_tol * (hi - lo)      # a wick this close counts as a touch
         # first touch after the gap completed, then a close through the far side
         for x in range(j + 1, n):
@@ -149,6 +163,7 @@ def find_zones(df: pd.DataFrame, tf: str, side: str = "demand", touch_tol: float
         if mirror:
             z.lo, z.hi = -hi, -lo
         out.append(z)
+    out.sort(key=lambda z: z.first)
     return out
 
 
@@ -208,7 +223,7 @@ def zone_bojans(z: Zone, frames: dict, tfs: list[str], min_wick: float = 0.4, to
 # ------------------------------------------------------------- scanning -----
 
 def scan_zones(frames: dict, tfs: list[str], keep: int = 6, min_wick: float = 0.4,
-               touch_tol: float = 0.0, min_ratio: float = 0.0, max_age: int = 0) -> list[Zone]:
+               touch_tol: float = 0.0, min_ratio: float = 0.0, max_age: int = 0, gaps: bool = False) -> list[Zone]:
     """Fresh zones whose first touch is recent (within `keep` candles of the
     zone's timeframe), or that price has stayed in since the first touch."""
     found = []
@@ -218,7 +233,7 @@ def scan_zones(frames: dict, tfs: list[str], keep: int = 6, min_wick: float = 0.
             continue
         n = len(df)
         for side in ("demand", "supply"):
-            for z in find_zones(df, tf, side, touch_tol, min_ratio):
+            for z in find_zones(df, tf, side, touch_tol, min_ratio, gaps):
                 if z.touch is None or z.broken is not None or (max_age and n - 1 - z.fvg > max_age):
                     continue
                 # listed while the first touch is recent, or while price hasn't left the zone since
@@ -230,7 +245,8 @@ def scan_zones(frames: dict, tfs: list[str], keep: int = 6, min_wick: float = 0.
 
 
 def scan_watch(frames: dict, tfs: list[str], touch_tol: float = 0.0, min_ratio: float = 0.0,
-               max_distance: float = 20.0, kinds=("structure", "ob"), max_age: int = 0) -> list[Zone]:
+               max_distance: float = 20.0, kinds=("structure", "ob"), max_age: int = 0,
+               gaps: bool = False) -> list[Zone]:
     """Fresh zones price hasn't reached yet, within `max_distance` % of the last close."""
     found = []
     for tf in tfs:
@@ -239,7 +255,7 @@ def scan_watch(frames: dict, tfs: list[str], touch_tol: float = 0.0, min_ratio: 
             continue
         price, n = float(df["close"].iloc[-1]), len(df)
         for side in ("demand", "supply"):
-            for z in find_zones(df, tf, side, touch_tol, min_ratio):
+            for z in find_zones(df, tf, side, touch_tol, min_ratio, gaps):
                 if z.touch is not None or z.kind not in kinds or price <= 0 or (max_age and n - 1 - z.fvg > max_age):
                     continue
                 z.distance = ((price - z.hi) if side == "demand" else (z.lo - price)) / price * 100

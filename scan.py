@@ -193,7 +193,8 @@ def zone_cfg(cfg) -> dict:
     z.setdefault("keep_candles", 6)
     z.setdefault("touch_tolerance", 0.05)
     z.setdefault("min_imbalance_ratio", 2.0)
-    z.setdefault("max_age_candles", 0)          # 0 = any age, as long as the zone is fresh
+    z.setdefault("max_age_candles", 0)
+    z.setdefault("stock_gaps", True)          # 0 = any age, as long as the zone is fresh
     z.setdefault("crypto_hourly_days", 365)
     w = dict(z.get("watch") or {})
     w.setdefault("enabled", True)
@@ -231,13 +232,14 @@ def zone_records(market: str, symbol: str, tv_symbol: str, frames: dict, cfg) ->
                              if t in frames], key=tf_rank)
     tfs, wtfs = pick(zc), pick(wc)
     tol = float(zc["touch_tolerance"])
+    gaps = market == "stocks" and bool(zc["stock_gaps"])
     touched = scan_zones(frames, tfs, keep=int(zc["keep_candles"]), min_wick=cfg["rules"].get("bojan_min_wick", 0.4),
                          touch_tol=tol, min_ratio=float(zc["min_imbalance_ratio"]),
-                         max_age=int(zc["max_age_candles"])) if zc["enabled"] else []
+                         max_age=int(zc["max_age_candles"]), gaps=gaps) if zc["enabled"] else []
     kinds = tuple(k for k, on in (("structure", wc["structure"]), ("ob", wc["order_blocks"])) if on)
     watch = scan_watch(frames, wtfs, touch_tol=tol, min_ratio=float(wc["min_imbalance_ratio"]),
                        max_distance=float(wc["max_distance_pct"]), kinds=kinds,
-                       max_age=int(zc["max_age_candles"])) if wc["enabled"] else []
+                       max_age=int(zc["max_age_candles"]), gaps=gaps) if wc["enabled"] else []
     recs, candles = [], {}
     low = sorted(frames, key=tf_rank)
     last = frames[low[0]].iloc[-1] if low else None
@@ -252,7 +254,7 @@ def zone_records(market: str, symbol: str, tv_symbol: str, frames: dict, cfg) ->
         zs, bojans = [], []
         for z in g:
             t = pd.DatetimeIndex(frames[z.tf].index)
-            zs.append({"tf": z.tf, "kind": z.kind, "lo": rnd(z.lo), "hi": rnd(z.hi), "ratio": round(z.ratio, 1),
+            zs.append({"tf": z.tf, "kind": z.kind, "via": z.via, "lo": rnd(z.lo), "hi": rnd(z.hi), "ratio": round(z.ratio, 1),
                        "start": iso(t[z.first]), "end": iso(t[z.last]), "fvg": iso(t[z.fvg]),
                        "touch": iso(t[z.touch]) if z.touch is not None else None,
                        "touch_bars_ago": int(len(t) - 1 - z.touch) if z.touch is not None else None,

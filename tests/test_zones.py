@@ -140,3 +140,13 @@ def test_old_fresh_zone_is_found_unless_age_limited():
     df = frame(rows)
     assert [z for z in scan_watch({"1D": df}, ["1D"], min_ratio=3, max_distance=50) if z.kind == "structure"]
     assert not [z for z in scan_watch({"1D": df}, ["1D"], min_ratio=3, max_distance=50, max_age=100) if z.kind == "structure"]
+
+
+def test_stock_price_gap_makes_a_zone():
+    # OB 100-104, then a gap up: next candle's low 110 > 104, high 120 -> imbalance 16 = 4x
+    rows = UP + [(103, 104, 100, 101), (111, 120, 110, 118), (118, 119, 112, 113), (113, 115, 111, 114)]
+    df = frame(rows)
+    assert not [z for z in find_zones(df, "1D", min_ratio=2) if z.lo == 100]
+    z = [z for z in find_zones(df, "1D", min_ratio=2, gaps=True) if z.lo == 100]
+    assert len(z) == 1 and z[0].via == "gap" and z[0].kind == "ob" and z[0].ratio == 4 and z[0].touch is None
+    assert not [z for z in find_zones(df, "1D", min_ratio=5, gaps=True) if z.lo == 100]

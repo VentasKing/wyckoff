@@ -242,6 +242,7 @@
       "order_blocks": true
     },
     "max_age_candles": 0,
-    "crypto_hourly_days": 365
+    "crypto_hourly_days": 365,
+    "stock_gaps": true
   }
 }
