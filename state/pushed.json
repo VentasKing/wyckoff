@@ -483,6 +483,7 @@
 "zone|BCH-USD|demand|8h|2026-11-26T08:00:00Z|hit",
 "zone|BCH-USD|demand|bojan|2D|2026-06-22T00:00:00Z",
 "zone|BCH-USD|supply|18h|2026-11-13T18:00:00Z|hit",
+"zone|BCH-USD|supply|18h|2026-11-26T18:00:00Z|hit",
 "zone|BCH-USD|supply|1W|2026-09-28T00:00:00Z|hit",
 "zone|BCH-USD|supply|4h|2026-11-14T04:00:00Z|hit",
 "zone|BCH-USD|supply|5h|2026-11-14T05:00:00Z|hit",
