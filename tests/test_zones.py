@@ -131,3 +131,12 @@ def test_watch_list_untouched_within_distance_with_own_ratio():
     assert not [z for z in scan_watch({"1D": df}, ["1D"], min_ratio=3.5, max_distance=30) if z.kind == "structure"]
     assert not [z for z in scan_watch({"1D": df}, ["1D"], min_ratio=3, max_distance=10) if z.kind == "structure"]
     assert not [z for z in scan_watch({"1D": df}, ["1D"], min_ratio=3, max_distance=30, kinds=("ob",)) if z.kind == "structure"]
+
+
+def test_old_fresh_zone_is_found_unless_age_limited():
+    from wyckoff_scanner.zones import scan_watch
+    rows = UP + [(102, 104, 97, 98), (98, 99, 94, 95), (95, 125, 95, 124), (124, 130, 106, 129)] + \
+        [(129, 131, 126, 130)] * 400
+    df = frame(rows)
+    assert [z for z in scan_watch({"1D": df}, ["1D"], min_ratio=3, max_distance=50) if z.kind == "structure"]
+    assert not [z for z in scan_watch({"1D": df}, ["1D"], min_ratio=3, max_distance=50, max_age=100) if z.kind == "structure"]

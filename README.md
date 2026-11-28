@@ -94,14 +94,16 @@ Switch tabs at the top of the dashboard. Same stocks and coins as the Wyckoff sc
 * **Fresh only:** a zone is listed at its first touch; second touches are ignored. A close through the far side drops it. Touched zones stay listed for `zones.keep_candles` candles of their timeframe, or for as long as price trades in them.
 * **Bojans:** formed (3–4 candles) or forming (2 candles, the newest still open) with a wick in or touching the zone, on the zone's timeframe or any lower one in the list.
 * **Groups:** zones on the same side are grouped under the highest-timeframe zone they overlap by at least half.
-* Timeframes: crypto 3W 2W 1W 6D–1D 18h 12h 8h–4h (built from Coinbase daily and hourly candles; hour candles restart at 00:00 UTC, multi-day candles count from 1970-01-01, multi-week from a Monday — TradingView's boundaries can differ slightly); stocks 2W 1W 1D 8h (8h = one regular session).
+* Timeframes: crypto 3W 2W 1W 6D–1D 18h 12h 8h–4h (built from Coinbase daily and hourly candles; hour candles restart at 00:00 UTC, multi-day candles count from 1970-01-01, multi-week from a Monday — TradingView's boundaries can differ slightly); stocks 2W 1W 1D 8h (8h = one regular session, so it is built from the daily with 5 years of history).
 
 | Setting | |
 |---|---|
 | `zones.enabled` | scan for zones |
 | `zones.crypto_timeframes`, `zones.stock_timeframes` | timeframes to look for zones on |
 | `zones.min_imbalance_ratio` | the candle that leaves the gap (high to low) must be at least this many times the zone's height (default 2) |
+| `zones.max_age_candles` | oldest zone considered, in candles of its timeframe, for both lists (default 0 = any age while fresh) |
+| `zones.crypto_hourly_days` | days of hourly crypto history behind the 4h–18h zones (default 365) |
 | `zones.touch_tolerance` | a wick within this share of the zone's height counts as a touch (default 0.05); also used for Bojan wicks |
 | `zones.keep_candles` | how long a touched zone stays listed (candles on its timeframe) |
-| `zones.watch.*` | the **Watching** list of untouched zones, with its own rules: `enabled`, `crypto_timeframes`, `stock_timeframes`, `min_imbalance_ratio` (default 3), `max_distance_pct` (default 20), `structure`, `order_blocks` |
+| `zones.watch.*` | the **Watching** list of untouched zones, with its own rules: `enabled`, `crypto_timeframes`, `stock_timeframes`, `min_imbalance_ratio` (default 3), `max_distance_pct` (default 50), `structure`, `order_blocks` |
 | `alerts.zone_hit`, `alerts.zone_bojan` | phone alerts for a first touch and for a Bojan formed in a zone |

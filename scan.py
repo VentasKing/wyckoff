@@ -193,12 +193,14 @@ def zone_cfg(cfg) -> dict:
     z.setdefault("keep_candles", 6)
     z.setdefault("touch_tolerance", 0.05)
     z.setdefault("min_imbalance_ratio", 2.0)
+    z.setdefault("max_age_candles", 0)          # 0 = any age, as long as the zone is fresh
+    z.setdefault("crypto_hourly_days", 365)
     w = dict(z.get("watch") or {})
     w.setdefault("enabled", True)
     w.setdefault("crypto_timeframes", z["crypto_timeframes"])
     w.setdefault("stock_timeframes", z["stock_timeframes"])
     w.setdefault("min_imbalance_ratio", 3.0)
-    w.setdefault("max_distance_pct", 20)
+    w.setdefault("max_distance_pct", 50)
     w.setdefault("structure", True)
     w.setdefault("order_blocks", True)
     z["watch"] = w
@@ -230,10 +232,12 @@ def zone_records(market: str, symbol: str, tv_symbol: str, frames: dict, cfg) ->
     tfs, wtfs = pick(zc), pick(wc)
     tol = float(zc["touch_tolerance"])
     touched = scan_zones(frames, tfs, keep=int(zc["keep_candles"]), min_wick=cfg["rules"].get("bojan_min_wick", 0.4),
-                         touch_tol=tol, min_ratio=float(zc["min_imbalance_ratio"])) if zc["enabled"] else []
+                         touch_tol=tol, min_ratio=float(zc["min_imbalance_ratio"]),
+                         max_age=int(zc["max_age_candles"])) if zc["enabled"] else []
     kinds = tuple(k for k, on in (("structure", wc["structure"]), ("ob", wc["order_blocks"])) if on)
     watch = scan_watch(frames, wtfs, touch_tol=tol, min_ratio=float(wc["min_imbalance_ratio"]),
-                       max_distance=float(wc["max_distance_pct"]), kinds=kinds) if wc["enabled"] else []
+                       max_distance=float(wc["max_distance_pct"]), kinds=kinds,
+                       max_age=int(zc["max_age_candles"])) if wc["enabled"] else []
     recs, candles = [], {}
     low = sorted(frames, key=tf_rank)
     last = frames[low[0]].iloc[-1] if low else None
@@ -287,7 +291,7 @@ def zone_records(market: str, symbol: str, tv_symbol: str, frames: dict, cfg) ->
     for fname, tfmap in candles.items():
         for tf in tfmap:
             tfmap[tf] = [[int(ts.value // 10**9), rnd(o), rnd(h), rnd(l), rnd(c)]
-                         for ts, o, h, l, c in frames[tf][["open", "high", "low", "close"]].iloc[-120:].itertuples()]
+                         for ts, o, h, l, c in frames[tf][["open", "high", "low", "close"]].iloc[-250:].itertuples()]
     return recs, candles
 
 
@@ -317,6 +321,8 @@ def stock_zone_frames(cache, symbol: str, tfs: list[str]) -> dict:
             out[tf] = d
         elif tf.endswith("W") and d is not None:
             out[tf] = resample_clock(d, tf)
+        elif tf.endswith("h") and int(tf[:-1]) * 60 >= 390 and d is not None:
+            out[tf] = d                    # a regular session is 6.5h: 7h+ candles are the daily, with 5 years of it
         elif tf.endswith("h") and m30 is not None:
             out[tf] = session_resample(m30, int(tf[:-1]) * 60)
         elif tf.endswith("D") and d is not None:
@@ -353,7 +359,7 @@ def scan_stocks(cfg) -> tuple[list[dict], dict]:
     srcs = {TF_SOURCE[t] for t in sc["timeframes"]}
     zon, ztfs = zone_on(zc), zone_tfs(zc, "stock_timeframes")
     if zon:
-        srcs |= {"1Day"} | ({"30Min"} if any(t.endswith("h") for t in ztfs) else set())
+        srcs |= {"1Day"} | ({"30Min"} if any(t.endswith("h") and int(t[:-1]) < 7 for t in ztfs) else set())
     for src in sorted(srcs):
         print(f"  downloading {src} for {len(syms)} stocks")
         update_cache(client, cache, syms, src)
@@ -415,7 +421,7 @@ def scan_crypto(cfg) -> tuple[list[dict], dict]:
         if zon:
             try:
                 if zh:
-                    fetch(pid, "1h", int(zc.get("crypto_hourly_bars", 3000)))
+                    fetch(pid, "1h", int(zc["crypto_hourly_days"]) * 24)
                 fetch(pid, "1D", int(zc.get("crypto_daily_bars", 3200)))
                 r_, c_ = zone_records("crypto", pid, coinbase_tv_symbol(p),
                                       crypto_zone_frames(natives, ztfs), cfg)

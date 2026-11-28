@@ -237,9 +237,11 @@
         "2W"
       ],
       "min_imbalance_ratio": 3,
-      "max_distance_pct": 20,
+      "max_distance_pct": 50,
       "structure": true,
       "order_blocks": true
-    }
+    },
+    "max_age_candles": 0,
+    "crypto_hourly_days": 365
   }
 }

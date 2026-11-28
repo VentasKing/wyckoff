@@ -208,7 +208,7 @@ def zone_bojans(z: Zone, frames: dict, tfs: list[str], min_wick: float = 0.4, to
 # ------------------------------------------------------------- scanning -----
 
 def scan_zones(frames: dict, tfs: list[str], keep: int = 6, min_wick: float = 0.4,
-               touch_tol: float = 0.0, min_ratio: float = 0.0) -> list[Zone]:
+               touch_tol: float = 0.0, min_ratio: float = 0.0, max_age: int = 0) -> list[Zone]:
     """Fresh zones whose first touch is recent (within `keep` candles of the
     zone's timeframe), or that price has stayed in since the first touch."""
     found = []
@@ -219,7 +219,7 @@ def scan_zones(frames: dict, tfs: list[str], keep: int = 6, min_wick: float = 0.
         n = len(df)
         for side in ("demand", "supply"):
             for z in find_zones(df, tf, side, touch_tol, min_ratio):
-                if z.touch is None or z.broken is not None:
+                if z.touch is None or z.broken is not None or (max_age and n - 1 - z.fvg > max_age):
                     continue
                 # listed while the first touch is recent, or while price hasn't left the zone since
                 if z.touch < n - keep and z.left is not None:
@@ -230,17 +230,17 @@ def scan_zones(frames: dict, tfs: list[str], keep: int = 6, min_wick: float = 0.
 
 
 def scan_watch(frames: dict, tfs: list[str], touch_tol: float = 0.0, min_ratio: float = 0.0,
-               max_distance: float = 20.0, kinds=("structure", "ob")) -> list[Zone]:
+               max_distance: float = 20.0, kinds=("structure", "ob"), max_age: int = 0) -> list[Zone]:
     """Fresh zones price hasn't reached yet, within `max_distance` % of the last close."""
     found = []
     for tf in tfs:
         df = frames.get(tf)
         if df is None or len(df) < 5:
             continue
-        price = float(df["close"].iloc[-1])
+        price, n = float(df["close"].iloc[-1]), len(df)
         for side in ("demand", "supply"):
             for z in find_zones(df, tf, side, touch_tol, min_ratio):
-                if z.touch is not None or z.kind not in kinds or price <= 0:
+                if z.touch is not None or z.kind not in kinds or price <= 0 or (max_age and n - 1 - z.fvg > max_age):
                     continue
                 z.distance = ((price - z.hi) if side == "demand" else (z.lo - price)) / price * 100
                 if z.distance > max_distance:
