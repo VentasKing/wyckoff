@@ -637,6 +637,7 @@
 "zone|DOT-USD|supply|7h|2026-11-24T00:00:00Z|hit",
 "zone|DOT-USD|supply|8h|2026-11-24T00:00:00Z|hit",
 "zone|DOT-USD|supply|bojan|8h|2026-11-26T00:00:00Z",
+"zone|ENA-USD|demand|18h|2026-11-26T18:00:00Z|hit",
 "zone|ENA-USD|demand|1W|2026-03-30T00:00:00Z|hit",
 "zone|ENA-USD|demand|1W|2026-08-03T00:00:00Z|hit",
 "zone|ENA-USD|demand|2W|2026-08-03T00:00:00Z|hit",
