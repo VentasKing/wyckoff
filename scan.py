@@ -193,7 +193,25 @@ def zone_cfg(cfg) -> dict:
     z.setdefault("keep_candles", 6)
     z.setdefault("touch_tolerance", 0.05)
     z.setdefault("min_imbalance_ratio", 2.0)
+    w = dict(z.get("watch") or {})
+    w.setdefault("enabled", True)
+    w.setdefault("crypto_timeframes", z["crypto_timeframes"])
+    w.setdefault("stock_timeframes", z["stock_timeframes"])
+    w.setdefault("min_imbalance_ratio", 3.0)
+    w.setdefault("max_distance_pct", 20)
+    w.setdefault("structure", True)
+    w.setdefault("order_blocks", True)
+    z["watch"] = w
     return z
+
+
+def zone_on(zc) -> bool:
+    return bool(zc["enabled"] or zc["watch"]["enabled"])
+
+
+def zone_tfs(zc, key) -> list[str]:
+    from wyckoff_scanner.zones import tf_rank
+    return sorted(set(zc[key]) | set(zc["watch"][key]), key=tf_rank)
 
 
 def tv_link(tv_symbol: str, tf: str) -> str:
@@ -202,28 +220,38 @@ def tv_link(tv_symbol: str, tf: str) -> str:
 
 
 def zone_records(market: str, symbol: str, tv_symbol: str, frames: dict, cfg) -> tuple[list[dict], dict]:
-    """Zone groups for one symbol, plus the candles each group's chart needs."""
-    from wyckoff_scanner.zones import group_zones, scan_zones, tf_rank
+    """Zone groups for one symbol (touched list and watch list), plus the candles
+    each group's chart needs."""
+    from wyckoff_scanner.zones import group_zones, scan_watch, scan_zones, tf_rank
     zc = zone_cfg(cfg)
-    tfs = [t for t in (zc["crypto_timeframes"] if market == "crypto" else zc["stock_timeframes"]) if t in frames]
-    tfs.sort(key=tf_rank)
-    zones = scan_zones(frames, tfs, keep=int(zc["keep_candles"]),
-                       min_wick=cfg["rules"].get("bojan_min_wick", 0.4),
-                       touch_tol=float(zc["touch_tolerance"]), min_ratio=float(zc["min_imbalance_ratio"]))
+    wc = zc["watch"]
+    pick = lambda c: sorted([t for t in (c["crypto_timeframes"] if market == "crypto" else c["stock_timeframes"])
+                             if t in frames], key=tf_rank)
+    tfs, wtfs = pick(zc), pick(wc)
+    tol = float(zc["touch_tolerance"])
+    touched = scan_zones(frames, tfs, keep=int(zc["keep_candles"]), min_wick=cfg["rules"].get("bojan_min_wick", 0.4),
+                         touch_tol=tol, min_ratio=float(zc["min_imbalance_ratio"])) if zc["enabled"] else []
+    kinds = tuple(k for k, on in (("structure", wc["structure"]), ("ob", wc["order_blocks"])) if on)
+    watch = scan_watch(frames, wtfs, touch_tol=tol, min_ratio=float(wc["min_imbalance_ratio"]),
+                       max_distance=float(wc["max_distance_pct"]), kinds=kinds) if wc["enabled"] else []
     recs, candles = [], {}
-    low_tf = tfs[0] if tfs else None
-    last = frames[low_tf].iloc[-1] if low_tf else None
-    for g in group_zones(zones):
+    low = sorted(frames, key=tf_rank)
+    last = frames[low[0]].iloc[-1] if low else None
+    price = float(last["close"]) if last is not None else None
+
+    def record(g, lst):
         top = g[0]
         tix = pd.DatetimeIndex(frames[top.tf].index)
-        gid = re.sub(r"[^A-Za-z0-9_-]", "-", f"{symbol}-{top.side}-{top.tf}-{iso(tix[top.first])}")
+        gid = re.sub(r"[^A-Za-z0-9_-]", "-", ("watch-" if lst == "watch" else "") +
+                     f"{symbol}-{top.side}-{top.tf}-{iso(tix[top.first])}")
         lo, hi = min(z.lo for z in g), max(z.hi for z in g)
         zs, bojans = [], []
         for z in g:
             t = pd.DatetimeIndex(frames[z.tf].index)
-            zs.append({"tf": z.tf, "kind": z.kind, "lo": rnd(z.lo), "hi": rnd(z.hi),
+            zs.append({"tf": z.tf, "kind": z.kind, "lo": rnd(z.lo), "hi": rnd(z.hi), "ratio": round(z.ratio, 1),
                        "start": iso(t[z.first]), "end": iso(t[z.last]), "fvg": iso(t[z.fvg]),
-                       "touch": iso(t[z.touch]), "touch_bars_ago": int(len(t) - 1 - z.touch),
+                       "touch": iso(t[z.touch]) if z.touch is not None else None,
+                       "touch_bars_ago": int(len(t) - 1 - z.touch) if z.touch is not None else None,
                        "tv": tv_link(tv_symbol, z.tf)})
             for b in z.bojans:
                 bi = frames[b["tf"]].index
@@ -231,24 +259,31 @@ def zone_records(market: str, symbol: str, tv_symbol: str, frames: dict, cfg) ->
                                "bars_ago": int(len(bi) - 1 - bi.get_loc(b["end"])),
                                "end": iso(b["end"]), "time": iso(b["time"]), "price": rnd(b["price"]),
                                "candles": b["candles"], "tv": tv_link(tv_symbol, b["tf"])})
-        # one Bojan per (tf, start): keep it under its highest zone
-        seen, uniq = set(), []
+        seen, uniq = set(), []            # one Bojan per (tf, start): keep it under its highest zone
         for b in bojans:
             k = (b["tf"], b["start"])
             if k not in seen:
                 seen.add(k)
                 uniq.append(b)
-        in_zone = last is not None and float(last["low"]) <= hi and float(last["high"]) >= lo
-        recs.append({"id": gid, "market": market, "symbol": symbol, "side": top.side,
-                     "tfs": [z.tf for z in g], "lo": rnd(lo), "hi": rnd(hi),
-                     "price": rnd(float(last["close"])) if last is not None else None,
-                     "state": "in zone" if in_zone else "touched",
-                     "touch": max(z["touch"] for z in zs), "zones": zs, "bojans": uniq,
-                     "tv": tv_link(tv_symbol, top.tf)})
-        recs[-1]["tfs"] = list(dict.fromkeys(recs[-1]["tfs"]))
-        recs[-1]["chart"] = symbol_file(symbol)
+        rec = {"id": gid, "list": lst, "market": market, "symbol": symbol, "side": top.side,
+               "tfs": list(dict.fromkeys(z.tf for z in g)), "lo": rnd(lo), "hi": rnd(hi),
+               "price": rnd(price) if price is not None else None, "zones": zs, "bojans": uniq,
+               "tv": tv_link(tv_symbol, top.tf), "chart": symbol_file(symbol)}
+        if lst == "watch":
+            dist = ((price - hi) if top.side == "demand" else (lo - price)) / price * 100 if price else None
+            rec.update(state="watching", distance=round(dist, 2) if dist is not None else None,
+                       touch=None, formed=max(z["fvg"] for z in zs))
+        else:
+            in_zone = last is not None and float(last["low"]) <= hi and float(last["high"]) >= lo
+            rec.update(state="in zone" if in_zone else "touched", touch=max(z["touch"] for z in zs))
+        recs.append(rec)
         for tf in {z.tf for z in g} | {b["tf"] for b in uniq}:
             candles.setdefault(symbol_file(symbol), {})[tf] = None
+
+    for g in group_zones(touched):
+        record(g, "touched")
+    for g in group_zones(watch):
+        record(g, "watch")
     for fname, tfmap in candles.items():
         for tf in tfmap:
             tfmap[tf] = [[int(ts.value // 10**9), rnd(o), rnd(h), rnd(l), rnd(c)]
@@ -316,17 +351,18 @@ def scan_stocks(cfg) -> tuple[list[dict], dict]:
     syms = [u["symbol"] for u in universe]
     zc = zone_cfg(cfg)
     srcs = {TF_SOURCE[t] for t in sc["timeframes"]}
-    if zc["enabled"]:
-        srcs |= {"1Day"} | ({"30Min"} if any(t.endswith("h") for t in zc["stock_timeframes"]) else set())
+    zon, ztfs = zone_on(zc), zone_tfs(zc, "stock_timeframes")
+    if zon:
+        srcs |= {"1Day"} | ({"30Min"} if any(t.endswith("h") for t in ztfs) else set())
     for src in sorted(srcs):
         print(f"  downloading {src} for {len(syms)} stocks")
         update_cache(client, cache, syms, src)
     sigs, zrecs, zcandles = [], [], {}
     for u in universe:
-        if zc["enabled"]:
+        if zon:
             try:
                 r_, c_ = zone_records("stocks", u["symbol"], u["tv"],
-                                      stock_zone_frames(cache, u["symbol"], zc["stock_timeframes"]), cfg)
+                                      stock_zone_frames(cache, u["symbol"], ztfs), cfg)
                 zrecs += r_
                 zcandles.update(c_)
             except Exception as e:  # noqa: BLE001
@@ -364,7 +400,8 @@ def scan_crypto(cfg) -> tuple[list[dict], dict]:
         prods = coinbase_top_products(n, products=allp)
     from wyckoff_scanner import data as D
     zc = zone_cfg(cfg)
-    zh = any(t.endswith("h") for t in zc["crypto_timeframes"])
+    zon, ztfs = zone_on(zc), zone_tfs(zc, "crypto_timeframes")
+    zh = any(t.endswith("h") for t in ztfs)
     sigs, zrecs, zcandles = [], [], {}
     for p in prods:
         pid = p["product_id"]
@@ -375,13 +412,13 @@ def scan_crypto(cfg) -> tuple[list[dict], dict]:
             if have is None or len(have) < bars:
                 _n[src] = D._coinbase_native(product_id, src, bars)
             return _n[src].iloc[-bars:]
-        if zc["enabled"]:
+        if zon:
             try:
                 if zh:
                     fetch(pid, "1h", int(zc.get("crypto_hourly_bars", 3000)))
                 fetch(pid, "1D", int(zc.get("crypto_daily_bars", 3200)))
                 r_, c_ = zone_records("crypto", pid, coinbase_tv_symbol(p),
-                                      crypto_zone_frames(natives, zc["crypto_timeframes"]), cfg)
+                                      crypto_zone_frames(natives, ztfs), cfg)
                 zrecs += r_
                 zcandles.update(c_)
             except Exception as e:  # noqa: BLE001
@@ -495,6 +532,8 @@ def zone_alert_events(zones: list[dict], cfg) -> list[tuple[str, dict, str]]:
     a = cfg["alerts"]
     out = []
     for g in zones:
+        if g.get("list") == "watch":
+            continue
         for z in g["zones"]:
             if a.get("zone_hit", True) and z.get("touch_bars_ago", 0) <= 1:
                 out.append((f"zone|{g['symbol']}|{g['side']}|{z['tf']}|{z['start']}|hit", g, f"{z['tf']} {g['side']} hit"))
@@ -562,7 +601,9 @@ def push_zone_alerts(zones, cfg, topic, opener=None) -> int:
 
 
 def write_zones(now, zones: dict, zcandles: dict, cfg) -> None:
-    allz = sorted(zones["stocks"] + zones["crypto"], key=lambda z: z["touch"], reverse=True)
+    both = zones["stocks"] + zones["crypto"]
+    allz = sorted([z for z in both if z.get("list") != "watch"], key=lambda z: z["touch"], reverse=True) + \
+        sorted([z for z in both if z.get("list") == "watch"], key=lambda z: z.get("distance") or 0)
     (OUT.parent / 'zones.json').parent.mkdir(parents=True, exist_ok=True)
     (OUT.parent / 'zones.json').write_text(json.dumps({"generated_at": iso(now), "zones": allz}, separators=(",", ":")))
     (OUT.parent / 'zones').mkdir(parents=True, exist_ok=True)

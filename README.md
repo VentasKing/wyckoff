@@ -103,4 +103,5 @@ Switch tabs at the top of the dashboard. Same stocks and coins as the Wyckoff sc
 | `zones.min_imbalance_ratio` | the candle that leaves the gap (high to low) must be at least this many times the zone's height (default 2) |
 | `zones.touch_tolerance` | a wick within this share of the zone's height counts as a touch (default 0.05); also used for Bojan wicks |
 | `zones.keep_candles` | how long a touched zone stays listed (candles on its timeframe) |
+| `zones.watch.*` | the **Watching** list of untouched zones, with its own rules: `enabled`, `crypto_timeframes`, `stock_timeframes`, `min_imbalance_ratio` (default 3), `max_distance_pct` (default 20), `structure`, `order_blocks` |
 | `alerts.zone_hit`, `alerts.zone_bojan` | phone alerts for a first touch and for a Bojan formed in a zone |

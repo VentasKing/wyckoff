@@ -209,6 +209,7 @@ body.show-settings #zonesview{display:none}
 <div id="zonesview">
   <section class="stats" id="zstats"></section>
   <section class="filters" aria-label="Zone filters">
+    <div class="fgroup" id="zf-list"><span>List</span></div>
     <div class="fgroup" id="zf-market"><span>Market</span></div>
     <div class="fgroup" id="zf-side"><span>Side</span></div>
     <div class="fgroup" id="zf-tf"><span>Timeframe</span></div>
@@ -217,7 +218,7 @@ body.show-settings #zonesview{display:none}
   </section>
   <main>
     <section class="list" aria-label="Zones">
-      <div class="listhead"><div><b id="zlisttitle">Zones hit</b> <span class="muted" id="zlistcount"></span></div><span class="muted" style="font-size:12px">Latest touch first</span></div>
+      <div class="listhead"><div><b id="zlisttitle">Zones hit</b> <span class="muted" id="zlistcount"></span></div><span class="muted" style="font-size:12px" id="zlistsort">Latest touch first</span></div>
       <div class="rows" id="zrows"></div>
     </section>
     <section class="detail" id="zdetail" aria-label="Selected zone"></section>
@@ -550,7 +551,8 @@ body.show-settings #zonesview{display:none}
   const ZTF = ['4h', '5h', '6h', '7h', '8h', '12h', '18h', '1D', '2D', '3D', '4D', '5D', '6D', '1W', '2W', '3W'];
   let ZDATA = null, zsel = null, zchart = null, zchartTf = null;
   const zcandles = {};
-  const ZF = { market: 'All', side: 'All', tfs: {}, bojan: false, showDone: false };
+  const ZF = { list: store.get('zlist', 'touched'), market: 'All', side: 'All', tfs: {}, bojan: false, showDone: false };
+  const zlist = (g) => g.list || 'touched';
   const zid = () => (location.hash.startsWith('#zone=') ? decodeURIComponent(location.hash.slice(6)) : null);
   const tabIsZones = () => { const h = location.hash; if (h.startsWith('#zone=') || h === '#zones') return true;
     if (h && h !== '#' && h !== '#settings') return false; return store.get('tab', 'taps') === 'zones'; };
@@ -567,11 +569,12 @@ body.show-settings #zonesview{display:none}
   }
 
   function zvisible() {
-    return ZDATA.zones.filter((g) => (ZF.market === 'All' || g.market === ZF.market.toLowerCase()) &&
+    return ZDATA.zones.filter((g) => zlist(g) === ZF.list && (ZF.market === 'All' || g.market === ZF.market.toLowerCase()) &&
       (ZF.side === 'All' || g.side === ZF.side.toLowerCase()) && g.tfs.some((t) => ZF.tfs[t] !== false) &&
       (!ZF.bojan || g.bojans.length) && (ZF.showDone ? isDone(g.id) : !isDone(g.id)));
   }
 
+  const distText = (g) => (g.distance == null ? 'untouched' : `${g.distance < 10 ? g.distance.toFixed(1) : Math.round(g.distance)}% away`);
   const sideWord = (g) => (g.side === 'demand' ? 'Demand' : 'Supply');
   const bojanBadges = (g, big) => {
     const f = g.bojans.filter((b) => b.state === 'formed'), p = g.bojans.filter((b) => b.state === 'forming');
@@ -582,8 +585,14 @@ body.show-settings #zonesview{display:none}
 
   function renderZones() {
     if (!ZDATA) return;
-    const all = ZDATA.zones;
+    const all = ZDATA.zones.filter((g) => zlist(g) === ZF.list);
+    const W = ZF.list === 'watch';
     const present = ZTF.filter((t) => all.some((g) => g.tfs.includes(t)));
+    const nT = ZDATA.zones.filter((g) => zlist(g) === 'touched').length, nW = ZDATA.zones.length - nT;
+    chips($('#zf-list'), [['touched', `Touched · ${nT}`], ['watch', `Watching · ${nW}`]].map(([k, l]) => [l, ZF.list === k, () => {
+      ZF.list = k; store.set('zlist', k); history.replaceState('', document.title, location.pathname + '#zones'); renderZones(); }]));
+    $('#zf-bojan').style.display = W ? 'none' : '';
+    if (W) ZF.bojan = false;
     chips($('#zf-market'), ['All', 'Stocks', 'Crypto'].map((x) => [x, ZF.market === x, () => { ZF.market = x; renderZones(); }]));
     chips($('#zf-side'), ['All', 'Demand', 'Supply'].map((x) => [x, ZF.side === x, () => { ZF.side = x; renderZones(); }]));
     chips($('#zf-tf'), present.map((t) => [t, ZF.tfs[t] !== false, () => { ZF.tfs[t] = ZF.tfs[t] === false; renderZones(); }]));
@@ -595,31 +604,39 @@ body.show-settings #zonesview{display:none}
     $('#zf-done').onclick = () => { ZF.showDone = !ZF.showDone; history.replaceState('', document.title, location.pathname + '#zones'); renderZones(); };
 
     const vis = zvisible();
-    $('#zstats').innerHTML = [
+    $('#zstats').innerHTML = (W ? [
+      ['Zones watching', vis.length, '#4C9EFF'],
+      ['Within 5%', vis.filter((g) => g.distance <= 5).length, '#F5A524'],
+      ['Demand below', vis.filter((g) => g.side === 'demand').length, '#4CC38A'],
+      ['Supply above', vis.filter((g) => g.side === 'supply').length, '#F08C6C'],
+    ] : [
       ['Zones hit', vis.length, '#4C9EFF'],
       ['Price in zone now', vis.filter((g) => g.state === 'in zone').length, '#4CC38A'],
       ['Bojan formed', vis.filter((g) => g.bojans.some((b) => b.state === 'formed')).length, '#E879C0'],
       ['Bojan forming', vis.filter((g) => g.bojans.some((b) => b.state === 'forming')).length, '#C9D2DD'],
-    ].map(([l, v, c]) => `<div class="stat"><div class="muted" style="font-size:12px">${l}</div><div class="v">${v}<span class="dot" style="background:${c}"></span></div></div>`).join('');
+    ]).map(([l, v, c]) => `<div class="stat"><div class="muted" style="font-size:12px">${l}</div><div class="v">${v}<span class="dot" style="background:${c}"></span></div></div>`).join('');
 
-    $('#zlisttitle').textContent = ZF.showDone ? 'Marked done' : 'Zones hit';
+    $('#zlisttitle').textContent = ZF.showDone ? 'Marked done' : W ? 'Untouched zones' : 'Zones hit';
+    $('#zlistsort').textContent = W ? 'Nearest first' : 'Latest touch first';
     $('#zlistcount').textContent = '· ' + vis.length;
     const rows = $('#zrows');
     if (!ZDATA.generated_at) rows.innerHTML = '<div class="empty">No zone results yet. They come with the next scan.</div>';
-    else if (!vis.length) rows.innerHTML = `<div class="empty">${ZF.showDone ? 'Nothing marked done yet.' : 'No zones match these filters.'}</div>`;
+    else if (!vis.length) rows.innerHTML = `<div class="empty">${ZF.showDone ? 'Nothing marked done yet.' : W && !nW ? 'No untouched zones yet. They come with the next scan.' : 'No zones match these filters.'}</div>`;
     else rows.innerHTML = vis.map((g) => `
       <button type="button" class="sig" data-zid="${esc(g.id)}" aria-current="${zsel && zsel.id === g.id}">
         <div class="r1"><span style="display:flex;align-items:center;gap:8px;min-width:0">
           <span class="${g.side === 'demand' ? 'side-dem' : 'side-sup'}">${g.side === 'demand' ? '▲' : '▼'}</span>
           <span class="sym">${esc(g.symbol)}</span><span class="muted" style="font-size:11px">${g.market === 'stocks' ? 'Stock' : 'Crypto'}</span></span>
-          ${isDone(g.id) ? '<span class="donebadge">✓ Done</span>' : `<span class="state ${g.state === 'in zone' ? 'st-inzone' : 'st-touched'}">${g.state === 'in zone' ? 'In zone' : 'Touched'}</span>`}</div>
-        <div class="r2"><span style="display:flex;gap:4px;flex-wrap:wrap">${g.tfs.map((t) => `<span class="tf">${esc(t)}</span>`).join('')}</span><span class="muted">${esc(ago(g.touch))}</span></div>
-        <div class="r3"><span>${sideWord(g).toLowerCase()} ${num(g.lo)} – ${num(g.hi)}</span><span style="display:flex;gap:6px">${bojanBadges(g)}</span></div>
+          ${isDone(g.id) ? '<span class="donebadge">✓ Done</span>' : W ? `<span class="state st-touched">${distText(g)}</span>` : `<span class="state ${g.state === 'in zone' ? 'st-inzone' : 'st-touched'}">${g.state === 'in zone' ? 'In zone' : 'Touched'}</span>`}</div>
+        <div class="r2"><span style="display:flex;gap:4px;flex-wrap:wrap">${g.tfs.map((t) => `<span class="tf">${esc(t)}</span>`).join('')}</span><span class="muted">${esc(W ? 'formed ' + ago(g.formed) : ago(g.touch))}</span></div>
+        <div class="r3"><span>${sideWord(g).toLowerCase()} ${num(g.lo)} – ${num(g.hi)}</span><span style="display:flex;gap:6px">${W ? `<span class="muted">imbalance ${Math.max(...g.zones.map((z) => z.ratio || 0)).toFixed(1)}×</span>` : bojanBadges(g)}</span></div>
       </button>`).join('');
     rows.querySelectorAll('.sig').forEach((el) => el.onclick = () => { location.hash = 'zone=' + encodeURIComponent(el.dataset.zid); });
 
     const id = zid();
-    const found = id && all.find((g) => g.id === id);
+    const anyFound = id && ZDATA.zones.find((g) => g.id === id);
+    if (anyFound && zlist(anyFound) !== ZF.list) { ZF.list = zlist(anyFound); store.set('zlist', ZF.list); return renderZones(); }
+    const found = anyFound && all.find((g) => g.id === id);
     if (!found || !zsel || zsel.id !== found.id) zchartTf = null;
     zsel = found || (window.innerWidth > 820 ? vis[0] : null) || null;
     document.body.classList.toggle('has-zsel', !!found);
@@ -639,9 +656,9 @@ body.show-settings #zonesview{display:none}
           <div>
             <div class="dtitle"><h1>${esc(g.symbol)}</h1>
               <span class="sidepill ${dem ? 'sp-dem' : 'sp-sup'}">${dem ? '▲ Demand' : '▼ Supply'}</span>
-              <span class="state ${g.state === 'in zone' ? 'st-inzone' : 'st-touched'}" style="font-size:12px;padding:3px 8px">${g.state === 'in zone' ? 'Price in zone' : 'Touched'}</span>
+              <span class="state ${g.state === 'in zone' ? 'st-inzone' : 'st-touched'}" style="font-size:12px;padding:3px 8px">${g.list === 'watch' ? 'Untouched · ' + distText(g) : g.state === 'in zone' ? 'Price in zone' : 'Touched'}</span>
               ${bojanBadges(g, true)}</div>
-            <div class="muted" style="margin-top:6px;font-size:13px">${g.tfs.map(esc).join(' · ')} · ${num(g.lo)} – ${num(g.hi)} · first touch ${esc(when(g.touch))}</div>
+            <div class="muted" style="margin-top:6px;font-size:13px">${g.tfs.map(esc).join(' · ')} · ${num(g.lo)} – ${num(g.hi)} · ${g.list === 'watch' ? 'not touched yet' : 'first touch ' + esc(when(g.touch))}</div>
           </div>
           <div class="btns" style="display:flex;gap:8px;flex-wrap:wrap">
             <a class="btn" id="ztv" href="${esc(g.tv)}" target="_blank" rel="noopener">Open in TradingView ↗</a>
@@ -659,15 +676,16 @@ body.show-settings #zonesview{display:none}
       </div>
       <div class="facts">
         <div class="fact"><div class="muted" style="font-size:12px">Zone</div><div class="v">${num(g.lo)} – ${num(g.hi)}</div><div class="s">${g.zones.length} zone${g.zones.length === 1 ? '' : 's'} on ${g.tfs.length} timeframe${g.tfs.length === 1 ? '' : 's'}</div></div>
-        <div class="fact"><div class="muted" style="font-size:12px">Price</div><div class="v">${num(g.price)}</div><div class="s">${g.state === 'in zone' ? 'Trading in the zone' : 'Touched, now outside'}</div></div>
-        <div class="fact"><div class="muted" style="font-size:12px">First touch</div><div class="v" style="font-size:14px">${esc(when(g.touch))}</div><div class="s">${esc(ago(g.touch))}</div></div>
+        <div class="fact"><div class="muted" style="font-size:12px">Price</div><div class="v">${num(g.price)}</div><div class="s">${g.list === 'watch' ? distText(g) + ' from the zone' : g.state === 'in zone' ? 'Trading in the zone' : 'Touched, now outside'}</div></div>
+        ${g.list === 'watch' ? `<div class="fact"><div class="muted" style="font-size:12px">Imbalance</div><div class="v">${Math.max(...g.zones.map((z) => z.ratio || 0)).toFixed(1)}×</div><div class="s">gap candle vs zone, largest in group</div></div>`
+          : `<div class="fact"><div class="muted" style="font-size:12px">First touch</div><div class="v" style="font-size:14px">${esc(when(g.touch))}</div><div class="s">${esc(ago(g.touch))}</div></div>`}
         <div class="fact"><div class="muted" style="font-size:12px">Bojans</div><div class="v">${g.bojans.filter((b) => b.state === 'formed').length} formed · ${g.bojans.filter((b) => b.state === 'forming').length} forming</div><div class="s">wick in or touching the zone</div></div>
       </div>
       <div class="card"><h2>Zones in this group</h2>
-        <table class="zt"><thead><tr><th>TF</th><th>Type</th><th>Range</th><th>Formed</th><th>First touch</th><th></th></tr></thead><tbody>
-        ${g.zones.map((z) => `<tr><td><span class="tf">${esc(z.tf)}</span></td><td>${esc(kindName(z.kind))}</td><td class="mono">${num(z.lo)} – ${num(z.hi)}</td>
+        <table class="zt"><thead><tr><th>TF</th><th>Type</th><th>Range</th><th>Imbalance</th><th>Formed</th><th>First touch</th><th></th></tr></thead><tbody>
+        ${g.zones.map((z) => `<tr><td><span class="tf">${esc(z.tf)}</span></td><td>${esc(kindName(z.kind))}</td><td class="mono">${num(z.lo)} – ${num(z.hi)}</td><td class="mono">${z.ratio != null ? z.ratio.toFixed(1) + '×' : '–'}</td>
           <td>${esc(when(z.start))}${z.end !== z.start ? ' → ' + esc(when(z.end)) : ''}<div class="muted" style="font-size:12px">gap completed ${esc(when(z.fvg))}</div></td>
-          <td>${esc(when(z.touch))}<div class="muted" style="font-size:12px">${z.touch_bars_ago === 0 ? 'this candle' : z.touch_bars_ago + ' candle' + (z.touch_bars_ago === 1 ? '' : 's') + ' ago'}</div></td>
+          <td>${z.touch ? `${esc(when(z.touch))}<div class="muted" style="font-size:12px">${z.touch_bars_ago === 0 ? 'this candle' : z.touch_bars_ago + ' candle' + (z.touch_bars_ago === 1 ? '' : 's') + ' ago'}</div>` : '<span class="muted">Untouched</span>'}</td>
           <td><a href="${esc(z.tv)}" target="_blank" rel="noopener">${esc(z.tf)} chart ↗</a></td></tr>`).join('')}
         </tbody></table></div>
       ${g.bojans.length ? `<div class="card"><h2>Bojan ${dem ? 'lows' : 'highs'}</h2>
@@ -677,6 +695,7 @@ body.show-settings #zonesview{display:none}
           <td><a href="${esc(b.tv)}" target="_blank" rel="noopener">${esc(b.tf)} chart ↗</a></td></tr>`).join('')}
         </tbody></table></div>` : ''}`;
     $('#zbackbtn').onclick = () => { history.pushState('', document.title, location.pathname + '#zones'); renderZones(); window.scrollTo(0, 0); };
+    $('#zbackbtn').textContent = g.list === 'watch' ? '‹ Watching' : '‹ Zones';
     $('#zdonebtn').onclick = () => {
       const wasDone = isDone(g.id);
       setDone(g.id, !wasDone);
@@ -754,8 +773,8 @@ body.show-settings #zonesview{display:none}
     const times = new Set(rows.map((r) => r[0]));
     const marks = [];
     for (const z of g.zones.filter((z) => z.tf === zchartTf)) {
-      const t = Math.floor(new Date(z.touch) / 1000);
-      if (times.has(t)) marks.push({ time: t, position: dem ? 'belowBar' : 'aboveBar', color: col, shape: dem ? 'arrowUp' : 'arrowDown', text: 'first touch' });
+      const t = z.touch ? Math.floor(new Date(z.touch) / 1000) : null;
+      if (t && times.has(t)) marks.push({ time: t, position: dem ? 'belowBar' : 'aboveBar', color: col, shape: dem ? 'arrowUp' : 'arrowDown', text: 'first touch' });
       const s0 = Math.floor(new Date(z.start) / 1000);
       if (times.has(s0)) marks.push({ time: s0, position: dem ? 'belowBar' : 'aboveBar', color: '#8A94A3', shape: 'square', text: z.kind === 'structure' ? 'zone (leg)' : 'OB' });
     }
@@ -892,6 +911,8 @@ body.show-settings #zonesview{display:none}
     n(c.rules.bojan_timeframes_below ?? 2, 0, 6, 'Bojan timeframes below');
     { const v = c.rules.tap3_zone_tolerance ?? 0.05; if (!(typeof v === 'number' && v >= 0 && v <= 1)) errs.push('Order block tolerance must be a number from 0 to 1.'); }
     if (c.zones) n(c.zones.keep_candles, 1, 500, 'Zone keep candles');
+    if (c.zones && c.zones.watch) { n(c.zones.watch.max_distance_pct, 1, 100, 'Watching distance');
+      const v = c.zones.watch.min_imbalance_ratio; if (!(typeof v === 'number' && v >= 0 && v <= 20)) errs.push('Watching imbalance size must be between 0 and 20.'); }
     if (c.zones && !(typeof (c.zones.min_imbalance_ratio ?? 2) === 'number' && (c.zones.min_imbalance_ratio ?? 2) >= 0 && (c.zones.min_imbalance_ratio ?? 2) <= 20)) errs.push('Imbalance size must be between 0 and 20.');
     if (c.zones && !(typeof (c.zones.touch_tolerance ?? 0.05) === 'number' && (c.zones.touch_tolerance ?? 0.05) >= 0 && (c.zones.touch_tolerance ?? 0.05) <= 1)) errs.push('Touch tolerance must be between 0 and 1.');
     { const v = c.rules.min_tap3_spacing ?? 0.25; if (!(typeof v === 'number' && v >= 0 && v <= 2)) errs.push('Tap 3 spacing must be a number from 0 to 2.'); }
@@ -993,6 +1014,7 @@ body.show-settings #zonesview{display:none}
         <div class="muted" style="font-size:12px;margin-top:8px">My list · ${c.crypto.products.length} coins</div>${tags(c.crypto.products)}</div>
       <div class="card"><h2>Model rules</h2>${kv('Tap 2 is complete when price…', esc(T2[c.rules.tap2_return] || c.rules.tap2_return))}${kv('Require the AR to break structure', yes(c.rules.require_ar_break_of_structure))}${kv('Allow ranges inside larger ranges', yes(c.rules.allow_nested_ranges))}${kv('Tap 1 must close beyond every close of the last', (c.rules.trend_lookback ?? 50) + ' candles')}${kv('Deviations of the other end allowed', c.rules.max_opposite_deviations ?? 1)}${kv('Tap 2 → tap 3 must take at least', Math.round((c.rules.min_tap3_spacing ?? 0.25) * 100) + '% of tap 1 → tap 2')}</div>
       ${c.zones ? `<div class="card"><h2>Supply &amp; demand</h2>${kv('Scanning', yes(c.zones.enabled))}${kv('Crypto timeframes', esc(c.zones.crypto_timeframes.join(' · ')))}${kv('Stock timeframes', esc(c.zones.stock_timeframes.join(' · ')))}${kv('Keep a touched zone listed for', c.zones.keep_candles + ' candles')}${kv('Imbalance candle at least', (c.zones.min_imbalance_ratio ?? 2) + '× the zone')}${kv('Counts as a touch within', Math.round((c.zones.touch_tolerance ?? 0.05) * 100) + '% of the zone height')}${kv('Alert: zone first touched', yes(c.alerts.zone_hit ?? true))}${kv('Alert: Bojan in a zone', yes(c.alerts.zone_bojan ?? true))}</div>` : ''}
+      ${c.zones && c.zones.watch ? `<div class="card"><h2>Watching list</h2>${kv('Listing untouched zones', yes(c.zones.watch.enabled))}${kv('Crypto timeframes', esc(c.zones.watch.crypto_timeframes.join(' · ')))}${kv('Stock timeframes', esc(c.zones.watch.stock_timeframes.join(' · ')))}${kv('Imbalance candle at least', c.zones.watch.min_imbalance_ratio + '× the zone')}${kv('Within', c.zones.watch.max_distance_pct + '% of price')}${kv('Structure zones', yes(c.zones.watch.structure))}${kv('Order blocks', yes(c.zones.watch.order_blocks))}</div>` : ''}
       <div class="card"><h2>Phone alerts</h2>${kv('Tap 3 potential', yes(c.alerts.tap3_potential))}${kv('Tap 3 confirmed', yes(c.alerts.tap3_confirmed))}${kv('Model 1 forming', yes(c.alerts.model1_forming))}${kv('Only taps from the last', c.alerts.max_bars_ago + ' bars')}${kv('Time zone', esc(c.display.timezone))}</div>`;
   }
 
@@ -1017,6 +1039,8 @@ body.show-settings #zonesview{display:none}
     d.rules.bojan_min_wick = d.rules.bojan_min_wick ?? 0.4;
     d.rules.bojan_timeframes_below = d.rules.bojan_timeframes_below ?? 2;
     d.zones = Object.assign({ enabled: true, crypto_timeframes: ZTF.slice(), stock_timeframes: ['8h', '1D', '1W', '2W'], keep_candles: 6, touch_tolerance: 0.05, min_imbalance_ratio: 2 }, d.zones || {});
+    d.zones.watch = Object.assign({ enabled: true, crypto_timeframes: d.zones.crypto_timeframes.slice(), stock_timeframes: d.zones.stock_timeframes.slice(),
+      min_imbalance_ratio: 3, max_distance_pct: 20, structure: true, order_blocks: true }, d.zones.watch || {});
     d.alerts.zone_hit = d.alerts.zone_hit ?? true;
     d.alerts.zone_bojan = d.alerts.zone_bojan ?? true;
     g.innerHTML = `
@@ -1059,7 +1083,15 @@ body.show-settings #zonesview{display:none}
         <div class="fld"><div class="lbl">Stock timeframes</div>${tfChips('zones.stock_timeframes', ['8h', '1D', '1W', '2W', '3W'])}<div class="help">Stock 8h candles cover a whole regular session, like TradingView with extended hours off.</div></div>
         ${numf('zones.keep_candles', 'Keep a touched zone listed for (candles on its timeframe)', 'Zones price is still trading in stay listed until a close through the far side.', 6)}
         ${numf('zones.min_imbalance_ratio', 'Imbalance candle must be at least (× the zone’s size)', 'The candle that leaves the fair value gap, high to low, compared with the order block or structure leg, high to low. 2 = at least double. 0 = any gap counts.', 2, 0.5)}
-        ${numf('zones.touch_tolerance', 'A wick this close counts as a touch (share of the zone’s height)', '0.05 = within 5% of the zone’s height. Also used for Bojan wicks touching a zone. 0 = must trade into it.', 0.05, 0.01)}</div>`;
+        ${numf('zones.touch_tolerance', 'A wick this close counts as a touch (share of the zone’s height)', '0.05 = within 5% of the zone’s height. Also used for Bojan wicks touching a zone. 0 = must trade into it.', 0.05, 0.01)}</div>
+      <div class="card"><h2>Watching list (untouched zones)</h2><div class="muted" style="font-size:12px;margin-top:-6px">Its own rules, separate from the touched list</div>
+        ${sw('zones.watch.enabled', 'List untouched zones')}
+        <div class="fld"><div class="lbl">Crypto timeframes</div>${tfChips('zones.watch.crypto_timeframes', ZTF)}</div>
+        <div class="fld"><div class="lbl">Stock timeframes</div>${tfChips('zones.watch.stock_timeframes', ['8h', '1D', '1W', '2W', '3W'])}</div>
+        ${numf('zones.watch.min_imbalance_ratio', 'Imbalance candle must be at least (× the zone’s size)', '3 = the zone is at most a third of the candle that left the gap.', 3, 0.5)}
+        ${numf('zones.watch.max_distance_pct', 'Only zones within this % of price', 'How far from the current price a zone can be to be listed.', 20)}
+        ${sw('zones.watch.structure', 'Structure zones')}
+        ${sw('zones.watch.order_blocks', 'Order blocks')}</div>`;
     bindEditing();
   }
 

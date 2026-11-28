@@ -89,6 +89,8 @@ class Zone:
     touch: int | None = None  # first candle that traded into it
     broken: int | None = None # first close through the far side (after the touch)
     left: int | None = None   # first candle entirely outside the zone after the touch
+    ratio: float = 0.0        # imbalance candle (high-low) / zone height
+    distance: float | None = None   # untouched zones: % from the last close to the zone
     bojans: list = field(default_factory=list)
 
 
@@ -129,6 +131,7 @@ def find_zones(df: pd.DataFrame, tf: str, side: str = "demand", touch_tol: float
         if h[d] - l[d] < min_ratio * (hi - lo):
             continue                       # the imbalance candle must be >= min_ratio x the zone (high to low)
         z = Zone(side, kind, tf, lo, hi, first, last, j)
+        z.ratio = float((h[d] - l[d]) / (hi - lo)) if hi > lo else float("inf")
         reach = hi + touch_tol * (hi - lo)      # a wick this close counts as a touch
         # first touch after the gap completed, then a close through the far side
         for x in range(j + 1, n):
@@ -222,6 +225,26 @@ def scan_zones(frames: dict, tfs: list[str], keep: int = 6, min_wick: float = 0.
                 if z.touch < n - keep and z.left is not None:
                     continue
                 z.bojans = zone_bojans(z, frames, tfs, min_wick, touch_tol)
+                found.append(z)
+    return found
+
+
+def scan_watch(frames: dict, tfs: list[str], touch_tol: float = 0.0, min_ratio: float = 0.0,
+               max_distance: float = 20.0, kinds=("structure", "ob")) -> list[Zone]:
+    """Fresh zones price hasn't reached yet, within `max_distance` % of the last close."""
+    found = []
+    for tf in tfs:
+        df = frames.get(tf)
+        if df is None or len(df) < 5:
+            continue
+        price = float(df["close"].iloc[-1])
+        for side in ("demand", "supply"):
+            for z in find_zones(df, tf, side, touch_tol, min_ratio):
+                if z.touch is not None or z.kind not in kinds or price <= 0:
+                    continue
+                z.distance = ((price - z.hi) if side == "demand" else (z.lo - price)) / price * 100
+                if z.distance > max_distance:
+                    continue
                 found.append(z)
     return found
 

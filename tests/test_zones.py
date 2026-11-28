@@ -118,3 +118,16 @@ def test_imbalance_candle_must_be_double_the_zone():
     assert [z for z in find_zones(frame(rows), "1D", min_ratio=1.5) if z.kind == "structure"]
     big = rows[:5] + [(95, 125, 95, 124), (124, 130, 106, 129), (129, 131, 126, 130)]           # 30 high: >= 2x
     assert [z for z in find_zones(frame(big), "1D", min_ratio=2) if z.kind == "structure"]
+
+
+def test_watch_list_untouched_within_distance_with_own_ratio():
+    from wyckoff_scanner.zones import scan_watch
+    # leg 94-104 (10), displacement 95-125 (30 = 3x), price drifts up and away, never back
+    rows = UP + [(102, 104, 97, 98), (98, 99, 94, 95), (95, 125, 95, 124), (124, 130, 106, 129)] + \
+        [(129, 131, 126, 130)] * 5
+    df = frame(rows)
+    w = scan_watch({"1D": df}, ["1D"], min_ratio=3, max_distance=30)
+    assert [(z.kind, z.lo, z.hi, round(z.distance, 1)) for z in w if z.kind == "structure"] == [("structure", 94, 104, 20.0)]
+    assert not [z for z in scan_watch({"1D": df}, ["1D"], min_ratio=3.5, max_distance=30) if z.kind == "structure"]
+    assert not [z for z in scan_watch({"1D": df}, ["1D"], min_ratio=3, max_distance=10) if z.kind == "structure"]
+    assert not [z for z in scan_watch({"1D": df}, ["1D"], min_ratio=3, max_distance=30, kinds=("ob",)) if z.kind == "structure"]
