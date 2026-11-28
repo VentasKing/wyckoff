@@ -45,6 +45,6 @@
     "stock_timeframes": ["8h", "1D", "1W", "2W"],
     "keep_candles": 6,
     "touch_tolerance": 0.05,
-    "min_imbalance_ratio": 2
+    "min_imbalance_ratio": 2.3
   }
 }
